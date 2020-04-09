@@ -2,7 +2,7 @@ module ProductDependencyGraph exposing (ProductGraphModel, ProductGraphMsg, init
 
 import Array exposing (Array)
 import Dict exposing (Dict)
-import Html exposing (Html, button, div, input, label, li, option, select, span, text, ul)
+import Html exposing (Html, button, div, input, label, li, option, select, text, ul)
 import Html.Attributes exposing (for, id, selected, style, type_, value)
 import Html.Events exposing (onClick, onInput)
 import List
@@ -45,7 +45,7 @@ type alias ProductGraphModel =
 
 type ProductGraphMsg
     = SelectProduct Int IntermediateProduct
-    | UpdateQuantity Int Int
+    | UpdateQuantity Int Float
     | AddProductNeed
     | RemoveProductNeed Int
     | ToggleAltRecipe AltRecipe
@@ -172,7 +172,7 @@ onProductUpdate index product =
 onQuantityUpdate : Int -> String -> ProductGraphMsg
 onQuantityUpdate index quantity =
     quantity
-        |> String.toInt
+        |> String.toFloat
         |> Maybe.withDefault 1
         |> UpdateQuantity index
 
@@ -299,10 +299,10 @@ machineConsumption machine =
 
 
 type ItemIO
-    = ItemIO Int IntermediateProduct
+    = ItemIO Float IntermediateProduct
 
 
-perMinute : Int -> IntermediateProduct -> ItemIO
+perMinute : Float -> IntermediateProduct -> ItemIO
 perMinute quantity item =
     ItemIO quantity item
 
@@ -318,7 +318,11 @@ addItemIO (ItemIO a item) (ItemIO b _) =
 
 mulItemIO : Int -> ItemIO -> ItemIO
 mulItemIO coef (ItemIO quantity item) =
-    ItemIO (coef * quantity) item
+    let
+        floatCoef =
+            toFloat coef
+    in
+    ItemIO (floatCoef * quantity) item
 
 
 emptyItemIO : ItemIO -> Bool
@@ -326,12 +330,12 @@ emptyItemIO (ItemIO quantity _) =
     quantity <= 0
 
 
-canHandle : Int -> ItemIO -> Bool
+canHandle : Float -> ItemIO -> Bool
 canHandle target (ItemIO quantity _) =
     quantity >= target
 
 
-diminishIO : Int -> ItemIO -> ItemIO
+diminishIO : Float -> ItemIO -> ItemIO
 diminishIO toRemove (ItemIO quantity item) =
     let
         newQuantity =
@@ -340,12 +344,12 @@ diminishIO toRemove (ItemIO quantity item) =
     ItemIO newQuantity item
 
 
-getQuantity : ItemIO -> Int
+getQuantity : ItemIO -> Float
 getQuantity (ItemIO quantity _) =
     quantity
 
 
-setQuantity : Int -> ItemIO -> ItemIO
+setQuantity : Float -> ItemIO -> ItemIO
 setQuantity quantity (ItemIO _ item) =
     ItemIO quantity item
 
@@ -370,12 +374,12 @@ itemIOToMachineGroup activatedAltRecipes (ItemIO targetQuantity targetItem) =
                     getQuantity output
 
                 machineNeeded =
-                    toFloat targetQuantity
-                        / toFloat perMachineQuantity
+                    targetQuantity
+                        / perMachineQuantity
                         |> ceiling
 
                 rest =
-                    machineNeeded
+                    toFloat machineNeeded
                         * perMachineQuantity
                         - targetQuantity
 
@@ -654,7 +658,7 @@ getRecipeOf recipes product =
             if isRecipeActivated BoltedModularFrame recipes then
                 Recipe
                     { machine = Assembler
-                    , input = [ perMinute 8 ReinforcedIronPlate, perMinute 140 Screw ] -- 7.5
+                    , input = [ perMinute 7.5 ReinforcedIronPlate, perMinute 140 Screw ]
                     , output = perMinute 5 ModularFrame
                     }
 
@@ -696,15 +700,15 @@ getRecipeOf recipes product =
         VersatileFramework ->
             Recipe
                 { machine = Assembler
-                , input = [ perMinute 3 ModularFrame, perMinute 30 SteelBeam ] -- 2.5
+                , input = [ perMinute 2.5 ModularFrame, perMinute 30 SteelBeam ]
                 , output = perMinute 5 VersatileFramework
                 }
 
         AutomaticWire ->
             Recipe
                 { machine = Assembler
-                , input = [ perMinute 3 Stator, perMinute 50 CopperWire ]
-                , output = perMinute 3 AutomaticWire
+                , input = [ perMinute 2.5 Stator, perMinute 50 CopperWire ]
+                , output = perMinute 2.5 AutomaticWire
                 }
 
         Stator ->
@@ -972,7 +976,7 @@ assemblyMachineText machine =
 
 itemIOText : ItemIO -> String
 itemIOText (ItemIO num product) =
-    String.fromInt num
+    String.fromFloat num
         ++ " "
         ++ intermediateProductText product
 
@@ -1041,9 +1045,9 @@ selectProductView index item =
     select [ onInput (onProductUpdate index), style "margin-left" "1ch" ] (List.map (productOptionView item) allProducts)
 
 
-updateProductQuantityView : Int -> Int -> Html ProductGraphMsg
+updateProductQuantityView : Int -> Float -> Html ProductGraphMsg
 updateProductQuantityView index quantity =
-    input [ onInput (onQuantityUpdate index), value (String.fromInt quantity), type_ "number", Html.Attributes.min "1", style "width" "5ch" ] []
+    input [ onInput (onQuantityUpdate index), value (String.fromFloat quantity), type_ "number", Html.Attributes.min "1", style "width" "5ch" ] []
 
 
 itemIOInputView : Int -> ItemIO -> Html ProductGraphMsg
