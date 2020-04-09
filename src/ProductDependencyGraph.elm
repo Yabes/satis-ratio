@@ -654,7 +654,7 @@ getRecipeOf recipes product =
             if isRecipeActivated BoltedModularFrame recipes then
                 Recipe
                     { machine = Assembler
-                    , input = [ perMinute 8 ReinforcedIronPlate, perMinute 140 IronRod ] -- 7.5
+                    , input = [ perMinute 8 ReinforcedIronPlate, perMinute 140 Screw ] -- 7.5
                     , output = perMinute 5 ModularFrame
                     }
 
