@@ -1,0 +1,15 @@
+version: "3"
+
+services:
+  satis:
+    build: .
+    labels:
+      - "traefik.http.routers.satis.rule=Host(`satis.yabes.ovh`)"
+      - "traefik.http.routers.satis.entryPoints=websecure"
+      - "traefik.http.routers.satis.tls.certresolver=acme"
+    networks:
+      - proxy
+networks:
+  proxy:
+    external:
+      name: proxy
