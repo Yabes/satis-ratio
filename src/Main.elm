@@ -47,7 +47,7 @@ update msg model =
 view : Model -> Html Msg
 view { productGraph } =
     Element.layout
-        [ Font.color (stylesheetColor Stylesheet.PrimaryColor)
+        [ Font.color (stylesheetColor Stylesheet.TextColor)
         , Font.family [ Font.monospace ]
         , Element.padding (stylesheetSpacing Stylesheet.SmallSpace)
         ]

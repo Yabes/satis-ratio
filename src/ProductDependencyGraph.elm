@@ -1012,15 +1012,15 @@ machineGroupView (MachineGroup { kind, count, availableThrougtput, producing }) 
                 ""
 
             else
-                " with a surplus of " ++ itemIOText availableThrougtput
+                "with a surplus of " ++ itemIOText availableThrougtput
     in
-    String.fromInt count
-        ++ " "
-        ++ assemblyMachineText kind
-        ++ " producing "
-        ++ intermediateProductText producing
-        ++ remaining
-        |> text
+    row [ Element.spacing (stylesheetSpacing Stylesheet.SmallSpace) ]
+        [ text (String.fromInt count)
+        , el [ Font.light ] (text (assemblyMachineText kind))
+        , text "producing"
+        , el [ Font.light ] (text (intermediateProductText producing))
+        , text remaining
+        ]
 
 
 surround : a -> a -> List a -> List a
@@ -1049,7 +1049,7 @@ productionLaneView lane =
                 [ Element.spacing (stylesheetSpacing Stylesheet.SmallSpace) ]
                 [ text (String.fromInt count), viewGenerator generator ]
     in
-    column []
+    column [ Element.spacing (stylesheetSpacing Stylesheet.SmallSpace) ]
         [ row
             [ Element.spacing (stylesheetSpacing Stylesheet.SmallSpace) ]
             [ text
