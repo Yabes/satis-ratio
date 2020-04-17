@@ -2,16 +2,23 @@ module ProductDependencyGraph exposing (ProductGraphModel, ProductGraphMsg, init
 
 import Array exposing (Array)
 import Dict exposing (Dict)
-import Html exposing (Html, button, div, input, label, li, option, select, text, ul)
-import Html.Attributes exposing (for, id, selected, style, type_, value)
+import Element exposing (Element, column, el, row, text)
+import Element.Background as Background
+import Element.Font as Font
+import Element.Input as Input
+import Graph exposing (Graph)
+import Html exposing (Html, button, div, input, option, select)
+import Html.Attributes exposing (selected, style, type_, value)
 import Html.Events exposing (onClick, onInput)
 import List
+import Style exposing (edges, stylesheetColor, stylesheetFontsize, stylesheetSpacing)
 
 
 
--- type Belt
+-- type Transport
 --     = BeltMk1
 --     | BeltMk2
+--     | Pipe
 --
 --
 -- itemPerBelt : Belt -> Int
@@ -48,20 +55,38 @@ type ProductGraphMsg
     | UpdateQuantity Int Float
     | AddProductNeed
     | RemoveProductNeed Int
-    | ToggleAltRecipe AltRecipe
+    | UpdateAltRecipe String Bool
 
 
 type AltRecipe
     = BoltedModularFrame
 
 
-toggleAltRecipe : AltRecipe -> ActivatedAltRecipes -> ActivatedAltRecipes
-toggleAltRecipe recipe recipes =
-    let
-        key =
-            altRecipeText recipe
-    in
-    Dict.update key (Maybe.map not) recipes
+type EnergyGenerator
+    = BiomassBurner
+    | CoalGenerator
+
+
+powerPerGenerator : EnergyGenerator -> MW
+powerPerGenerator generator =
+    case generator of
+        BiomassBurner ->
+            MW 30
+
+        CoalGenerator ->
+            MW 30
+
+
+ioPerGenerator : EnergyGenerator -> List ItemIO
+ioPerGenerator generator =
+    case generator of
+        BiomassBurner ->
+            []
+
+        CoalGenerator ->
+            [ ItemIO 15 Coal
+            , ItemIO 45 Water
+            ]
 
 
 altRecipeText : AltRecipe -> String
@@ -69,16 +94,6 @@ altRecipeText recipe =
     case recipe of
         BoltedModularFrame ->
             "Bolted Modular Frame"
-
-
-parseAltRecipe : String -> Maybe AltRecipe
-parseAltRecipe string =
-    case string of
-        "Bolted Modular Frame" ->
-            Just BoltedModularFrame
-
-        _ ->
-            Nothing
 
 
 initProductGraph : ProductGraphModel
@@ -177,14 +192,6 @@ onQuantityUpdate index quantity =
         |> UpdateQuantity index
 
 
-onAltRecipeToggle : String -> ProductGraphMsg
-onAltRecipeToggle recipe =
-    recipe
-        |> parseAltRecipe
-        |> Maybe.withDefault BoltedModularFrame
-        |> ToggleAltRecipe
-
-
 updateProductGraph : ProductGraphMsg -> ProductGraphModel -> ProductGraphModel
 updateProductGraph msg model =
     case msg of
@@ -226,8 +233,8 @@ updateProductGraph msg model =
             in
             { model | needs = newNeeds }
 
-        ToggleAltRecipe recipe ->
-            { model | altRecipes = toggleAltRecipe recipe model.altRecipes }
+        UpdateAltRecipe recipe bool ->
+            { model | altRecipes = Dict.insert recipe bool model.altRecipes }
 
 
 removeIndexInArray : Int -> Array a -> Array a
@@ -981,7 +988,7 @@ itemIOText (ItemIO num product) =
         ++ intermediateProductText product
 
 
-machineGroupView : MachineGroup -> Html ProductGraphMsg
+machineGroupView : MachineGroup -> Element ProductGraphMsg
 machineGroupView (MachineGroup { kind, count, availableThrougtput, producing }) =
     let
         remaining =
@@ -1000,11 +1007,11 @@ machineGroupView (MachineGroup { kind, count, availableThrougtput, producing }) 
         |> text
 
 
-productionLaneView : ProductionLane -> Html ProductGraphMsg
+productionLaneView : ProductionLane -> Element ProductGraphMsg
 productionLaneView lane =
     let
         wrapGroupViewInLi group =
-            li [] [ machineGroupView group ]
+            row [] [ machineGroupView group ]
 
         addConsumption _ (MachineGroup { kind, count }) mw =
             kind
@@ -1016,12 +1023,12 @@ productionLaneView lane =
             lane
                 |> Dict.foldl addConsumption (makeMW 0)
     in
-    div [ style "margin-top" "16px" ]
+    column []
         [ text
             ("Total consumption: "
                 ++ textMW totalConsumption
             )
-        , ul
+        , column
             []
             (lane
                 |> Dict.values
@@ -1031,35 +1038,59 @@ productionLaneView lane =
         ]
 
 
-productOptionView : IntermediateProduct -> IntermediateProduct -> Html ProductGraphMsg
-productOptionView selectedProduct product =
-    let
-        isSelected =
-            selectedProduct == product
-    in
-    option [ value (intermediateProductText product), selected isSelected ] [ text (intermediateProductText product) ]
-
-
-selectProductView : Int -> IntermediateProduct -> Html ProductGraphMsg
+selectProductView : Int -> IntermediateProduct -> Element ProductGraphMsg
 selectProductView index item =
-    select [ onInput (onProductUpdate index), style "margin-left" "1ch" ] (List.map (productOptionView item) allProducts)
+    let
+        productOptionView selectedProduct product =
+            option
+                [ value <| intermediateProductText product
+                , selected <| selectedProduct == product
+                ]
+                [ Html.text <| intermediateProductText product ]
+
+        inputSelect =
+            Element.html <|
+                select
+                    [ onInput (onProductUpdate index), style "height" "40px" ]
+                    (List.map (productOptionView item) allProducts)
+    in
+    el [] inputSelect
 
 
-updateProductQuantityView : Int -> Float -> Html ProductGraphMsg
+updateProductQuantityView : Int -> Float -> Element ProductGraphMsg
 updateProductQuantityView index quantity =
-    input [ onInput (onQuantityUpdate index), value (String.fromFloat quantity), type_ "number", Html.Attributes.min "1", style "width" "5ch" ] []
+    Input.text
+        [ Element.htmlAttribute <| type_ "number"
+        , Element.htmlAttribute <| Html.Attributes.min "1"
+        , Element.width (Element.px 72)
+        ]
+        { onChange = onQuantityUpdate index
+        , text = String.fromFloat quantity
+        , placeholder = Nothing
+        , label = Input.labelHidden "Product Quantity"
+        }
 
 
-itemIOInputView : Int -> ItemIO -> Html ProductGraphMsg
+itemIOInputView : Int -> ItemIO -> Element ProductGraphMsg
 itemIOInputView index (ItemIO quantity product) =
-    div [ style "margin-top" "4px" ]
+    let
+        removeButton =
+            if index /= 0 then
+                Input.button
+                    [ Font.color (stylesheetColor Style.DangerColor) ]
+                    { onPress = Just (RemoveProductNeed index), label = text "Remove" }
+
+            else
+                Element.none
+    in
+    row [ Element.spacing (stylesheetSpacing Style.SmallSpace) ]
         [ updateProductQuantityView index quantity
         , selectProductView index product
-        , button [ onClick (RemoveProductNeed index), style "margin-left" "1ch" ] [ text "Remove" ]
+        , removeButton
         ]
 
 
-editionLineView : ProductGraphModel -> Html ProductGraphMsg
+editionLineView : ProductGraphModel -> Element ProductGraphMsg
 editionLineView { needs } =
     let
         needsInputs =
@@ -1067,27 +1098,38 @@ editionLineView { needs } =
                 |> Array.toList
                 |> List.indexedMap itemIOInputView
 
-        buttons =
-            [ button [ onClick AddProductNeed, style "display" "block", style "margin-top" "4px" ] [ text "Add" ]
-            ]
+        addButton =
+            Input.button
+                [ Font.color (stylesheetColor Style.InfoColor) ]
+                { onPress = Just AddProductNeed, label = text "+ Add" }
     in
-    div [ style "margin-top" "16px" ]
-        (text "I want to produce every minute" :: List.append needsInputs buttons)
+    column [ Element.spacing (stylesheetSpacing Style.SmallSpace) ]
+        (List.concat
+            [ [ text "I want to produce every minute" ]
+            , needsInputs
+            , [ addButton ]
+            ]
+        )
 
 
-toggleAltRecipesView : ActivatedAltRecipes -> Html ProductGraphMsg
+toggleAltRecipesView : ActivatedAltRecipes -> Element ProductGraphMsg
 toggleAltRecipesView recipes =
     let
-        altRecipeView key =
-            div []
-                [ input [ type_ "checkbox", onInput onAltRecipeToggle, id key ] []
-                , label [ for key, style "margin-left" "4px" ] [ text key ]
-                ]
+        altRecipeView ( key, value ) =
+            Input.checkbox []
+                { onChange = UpdateAltRecipe key
+                , icon = Input.defaultCheckbox
+                , checked = value
+                , label = Input.labelRight [] (text key)
+                }
     in
-    div [ style "margin-top" "16px" ] [ text "Alternative recipes ", div [] (recipes |> Dict.keys |> List.map altRecipeView) ]
+    column []
+        [ text "Alternative recipes "
+        , column [] (recipes |> Dict.toList |> List.map altRecipeView)
+        ]
 
 
-viewProductGraph : ProductGraphModel -> Html ProductGraphMsg
+viewProductGraph : ProductGraphModel -> Element ProductGraphMsg
 viewProductGraph model =
     let
         lane =
@@ -1095,7 +1137,7 @@ viewProductGraph model =
                 |> Array.toList
                 |> getProductLaneFor model.altRecipes
     in
-    div [ style "font-family" "monospace" ]
+    column [ Element.spacing (stylesheetSpacing Style.RegularSpace) ]
         [ toggleAltRecipesView model.altRecipes
         , editionLineView model
         , productionLaneView lane
