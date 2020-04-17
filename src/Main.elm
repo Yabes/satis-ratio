@@ -5,7 +5,7 @@ import Element
 import Element.Font as Font
 import Html exposing (Html)
 import ProductDependencyGraph exposing (ProductGraphModel, ProductGraphMsg, initProductGraph, updateProductGraph, viewProductGraph)
-import Style exposing (edges, stylesheetColor, stylesheetFontsize, stylesheetSpacing)
+import Stylesheet exposing (edges, stylesheetColor, stylesheetFontsize, stylesheetSpacing)
 
 
 
@@ -47,15 +47,15 @@ update msg model =
 view : Model -> Html Msg
 view { productGraph } =
     Element.layout
-        [ Font.color (stylesheetColor Style.PrimaryColor)
+        [ Font.color (stylesheetColor Stylesheet.PrimaryColor)
         , Font.family [ Font.monospace ]
-        , Element.padding (stylesheetSpacing Style.SmallSpace)
+        , Element.padding (stylesheetSpacing Stylesheet.SmallSpace)
         ]
         (Element.column
-            [ Font.size (stylesheetFontsize Style.TextSize) ]
+            [ Font.size (stylesheetFontsize Stylesheet.TextSize) ]
             [ Element.el
-                [ Font.size (stylesheetFontsize Style.TitleSize)
-                , Element.paddingEach { edges | bottom = stylesheetSpacing Style.LargeSpace }
+                [ Font.size (stylesheetFontsize Stylesheet.TitleSize)
+                , Element.paddingEach { edges | bottom = stylesheetSpacing Stylesheet.LargeSpace }
                 ]
                 (Element.text "Blunt Satisfactory ratio calculator")
             , Element.map ProductGraphMsg (viewProductGraph productGraph)

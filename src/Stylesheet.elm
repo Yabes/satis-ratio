@@ -1,4 +1,4 @@
-module Style exposing (ColorPalette(..), FontSize(..), Spacing(..), edges, stylesheetColor, stylesheetFontsize, stylesheetSpacing)
+module Stylesheet exposing (ColorPalette(..), FontSize(..), Spacing(..), edges, stylesheetColor, stylesheetFontsize, stylesheetSpacing)
 
 import Element
 
@@ -12,6 +12,8 @@ type ColorPalette
     | DangerColor
     | InfoColor
     | WhiteColor
+    | GreenColor
+    | BlackColor
 
 
 type FontSize
@@ -67,6 +69,12 @@ stylesheetColor palette =
 
         WhiteColor ->
             Element.rgb255 255 255 255
+
+        GreenColor ->
+            Element.rgb255 78 154 6
+
+        BlackColor ->
+            Element.rgb255 46 52 54
 
 
 stylesheetFontsize : FontSize -> Int

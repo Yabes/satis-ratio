@@ -3,7 +3,6 @@ module ProductDependencyGraph exposing (ProductGraphModel, ProductGraphMsg, init
 import Array exposing (Array)
 import Dict exposing (Dict)
 import Element exposing (Element, column, el, row, text)
-import Element.Background as Background
 import Element.Font as Font
 import Element.Input as Input
 import Graph exposing (Graph)
@@ -11,7 +10,7 @@ import Html exposing (Html, button, div, input, option, select)
 import Html.Attributes exposing (selected, style, type_, value)
 import Html.Events exposing (onClick, onInput)
 import List
-import Style exposing (edges, stylesheetColor, stylesheetFontsize, stylesheetSpacing)
+import Stylesheet exposing (edges, stylesheetColor, stylesheetFontsize, stylesheetSpacing)
 
 
 
@@ -74,7 +73,24 @@ powerPerGenerator generator =
             MW 30
 
         CoalGenerator ->
-            MW 30
+            MW 75
+
+
+getNeededGenerator : MW -> List ( EnergyGenerator, Int )
+getNeededGenerator (MW power) =
+    let
+        generatorCount generator =
+            let
+                (MW perGenerator) =
+                    powerPerGenerator generator
+            in
+            toFloat power
+                / toFloat perGenerator
+                |> ceiling
+    in
+    [ ( BiomassBurner, generatorCount BiomassBurner )
+    , ( CoalGenerator, generatorCount CoalGenerator )
+    ]
 
 
 ioPerGenerator : EnergyGenerator -> List ItemIO
@@ -874,7 +890,7 @@ getProductLaneForHelper activatedAltRecipes remaining lane =
 
 
 
--- View
+{- View -}
 
 
 intermediateProductText : IntermediateProduct -> String
@@ -1007,6 +1023,11 @@ machineGroupView (MachineGroup { kind, count, availableThrougtput, producing }) 
         |> text
 
 
+surround : a -> a -> List a -> List a
+surround start end list =
+    List.concat [ [ start ], list, [ end ] ]
+
+
 productionLaneView : ProductionLane -> Element ProductGraphMsg
 productionLaneView lane =
     let
@@ -1022,12 +1043,25 @@ productionLaneView lane =
         totalConsumption =
             lane
                 |> Dict.foldl addConsumption (makeMW 0)
+
+        neededGeneratorView ( generator, count ) =
+            row
+                [ Element.spacing (stylesheetSpacing Stylesheet.SmallSpace) ]
+                [ text (String.fromInt count), viewGenerator generator ]
     in
     column []
-        [ text
-            ("Total consumption: "
-                ++ textMW totalConsumption
-            )
+        [ row
+            [ Element.spacing (stylesheetSpacing Stylesheet.SmallSpace) ]
+            [ text
+                ("Total consumption: "
+                    ++ textMW totalConsumption
+                )
+            , getNeededGenerator totalConsumption
+                |> List.map neededGeneratorView
+                |> List.intersperse (text " / ")
+                |> surround (text "(") (text ")")
+                |> row []
+            ]
         , column
             []
             (lane
@@ -1077,13 +1111,13 @@ itemIOInputView index (ItemIO quantity product) =
         removeButton =
             if index /= 0 then
                 Input.button
-                    [ Font.color (stylesheetColor Style.DangerColor) ]
+                    [ Font.color (stylesheetColor Stylesheet.DangerColor) ]
                     { onPress = Just (RemoveProductNeed index), label = text "Remove" }
 
             else
                 Element.none
     in
-    row [ Element.spacing (stylesheetSpacing Style.SmallSpace) ]
+    row [ Element.spacing (stylesheetSpacing Stylesheet.SmallSpace) ]
         [ updateProductQuantityView index quantity
         , selectProductView index product
         , removeButton
@@ -1100,10 +1134,10 @@ editionLineView { needs } =
 
         addButton =
             Input.button
-                [ Font.color (stylesheetColor Style.InfoColor) ]
+                [ Font.color (stylesheetColor Stylesheet.InfoColor) ]
                 { onPress = Just AddProductNeed, label = text "+ Add" }
     in
-    column [ Element.spacing (stylesheetSpacing Style.SmallSpace) ]
+    column [ Element.spacing (stylesheetSpacing Stylesheet.SmallSpace) ]
         (List.concat
             [ [ text "I want to produce every minute" ]
             , needsInputs
@@ -1137,8 +1171,26 @@ viewProductGraph model =
                 |> Array.toList
                 |> getProductLaneFor model.altRecipes
     in
-    column [ Element.spacing (stylesheetSpacing Style.RegularSpace) ]
+    column [ Element.spacing (stylesheetSpacing Stylesheet.RegularSpace) ]
         [ toggleAltRecipesView model.altRecipes
         , editionLineView model
         , productionLaneView lane
         ]
+
+
+viewGenerator : EnergyGenerator -> Element ProductGraphMsg
+viewGenerator generator =
+    case generator of
+        BiomassBurner ->
+            el
+                [ Font.color (stylesheetColor Stylesheet.GreenColor)
+                , Font.bold
+                ]
+                (text "Biomass Burner")
+
+        CoalGenerator ->
+            el
+                [ Font.color (stylesheetColor Stylesheet.BlackColor)
+                , Font.bold
+                ]
+                (text "Coal Generator")
