@@ -39,13 +39,18 @@ import Stylesheet exposing (edges, stylesheetColor, stylesheetFontsize, styleshe
 --         BeltMk2
 
 
-type alias ActivatedAltRecipes =
+type alias RecipesOptions =
     Dict String Bool
+
+
+type RecipesOption
+    = BoltedModularFrame
+    | IncludeMiner
 
 
 type alias ProductGraphModel =
     { needs : Array ItemIO
-    , altRecipes : ActivatedAltRecipes
+    , altRecipes : RecipesOptions
     }
 
 
@@ -55,10 +60,6 @@ type ProductGraphMsg
     | AddProductNeed
     | RemoveProductNeed Int
     | UpdateAltRecipe String Bool
-
-
-type AltRecipe
-    = BoltedModularFrame
 
 
 type EnergyGenerator
@@ -105,17 +106,20 @@ ioPerGenerator generator =
             ]
 
 
-altRecipeText : AltRecipe -> String
-altRecipeText recipe =
-    case recipe of
+altRecipeText : RecipesOption -> String
+altRecipeText option =
+    case option of
         BoltedModularFrame ->
             "Bolted Modular Frame"
+
+        IncludeMiner ->
+            "Include Miners"
 
 
 initProductGraph : ProductGraphModel
 initProductGraph =
     { needs = Array.fromList [ perMinute 2 SmartPlating ]
-    , altRecipes = allAltRecipes |> List.map (\key -> ( altRecipeText key, False )) |> Dict.fromList
+    , altRecipes = allOptions |> List.map (\key -> ( altRecipeText key, False )) |> Dict.fromList
     }
 
 
@@ -387,7 +391,7 @@ setProduct product (ItemIO quantity _) =
     ItemIO quantity product
 
 
-itemIOToMachineGroup : ActivatedAltRecipes -> ItemIO -> MachineGroup
+itemIOToMachineGroup : RecipesOptions -> ItemIO -> MachineGroup
 itemIOToMachineGroup activatedAltRecipes (ItemIO targetQuantity targetItem) =
     let
         recipeToMachineGroup : Recipe -> MachineGroup
@@ -471,9 +475,9 @@ allProducts =
     [ CopperWire, CopperCable, CopperSheet, IronPlate, IronRod, Screw, ReinforcedIronPlate, Rotor, ModularFrame, SmartPlating, Steel, SteelBeam, SteelPipe, IndustrialSteelBeam, Stator, Motor, VersatileFramework, AutomaticWire ]
 
 
-allAltRecipes : List AltRecipe
-allAltRecipes =
-    [ BoltedModularFrame ]
+allOptions : List RecipesOption
+allOptions =
+    [ BoltedModularFrame, IncludeMiner ]
 
 
 getMachingeGroupOrderIndex : MachineGroup -> Int
@@ -489,7 +493,7 @@ getMachingeGroupOrderIndex (MachineGroup { producing }) =
             1000
 
         Concrete ->
-            1100
+            4000
 
         CopperOre ->
             2000
@@ -558,8 +562,8 @@ getMachingeGroupOrderIndex (MachineGroup { producing }) =
             7300
 
 
-isRecipeActivated : AltRecipe -> ActivatedAltRecipes -> Bool
-isRecipeActivated recipe recipes =
+isOptionActivated : RecipesOption -> RecipesOptions -> Bool
+isOptionActivated recipe recipes =
     let
         key =
             altRecipeText recipe
@@ -569,8 +573,8 @@ isRecipeActivated recipe recipes =
         |> Maybe.withDefault False
 
 
-getRecipeOf : ActivatedAltRecipes -> IntermediateProduct -> Recipe
-getRecipeOf recipes product =
+getRecipeOf : RecipesOptions -> IntermediateProduct -> Recipe
+getRecipeOf options product =
     case product of
         IronOre ->
             Recipe
@@ -608,11 +612,19 @@ getRecipeOf recipes product =
                 }
 
         Concrete ->
-            Recipe
-                { machine = Constructor
-                , input = [ perMinute 45 LimeStone ]
-                , output = perMinute 15 Concrete
-                }
+            if isOptionActivated IncludeMiner options then
+                Recipe
+                    { machine = Constructor
+                    , input = [ perMinute 45 LimeStone ]
+                    , output = perMinute 15 Concrete
+                    }
+
+            else
+                Recipe
+                    { machine = Constructor
+                    , input = []
+                    , output = perMinute 15 Concrete
+                    }
 
         CopperWire ->
             Recipe
@@ -678,7 +690,7 @@ getRecipeOf recipes product =
                 }
 
         ModularFrame ->
-            if isRecipeActivated BoltedModularFrame recipes then
+            if isOptionActivated BoltedModularFrame options then
                 Recipe
                     { machine = Assembler
                     , input = [ perMinute 7.5 ReinforcedIronPlate, perMinute 140 Screw ]
@@ -693,11 +705,19 @@ getRecipeOf recipes product =
                     }
 
         Steel ->
-            Recipe
-                { machine = Foundry
-                , input = [ perMinute 45 IronOre, perMinute 45 Coal ]
-                , output = perMinute 45 Steel
-                }
+            if isOptionActivated IncludeMiner options then
+                Recipe
+                    { machine = Foundry
+                    , input = [ perMinute 45 IronOre, perMinute 45 Coal ]
+                    , output = perMinute 45 Steel
+                    }
+
+            else
+                Recipe
+                    { machine = Foundry
+                    , input = []
+                    , output = perMinute 45 Steel
+                    }
 
         SteelPipe ->
             Recipe
@@ -749,18 +769,34 @@ getRecipeOf recipes product =
                 }
 
         IronIngot ->
-            Recipe
-                { machine = Smelter
-                , input = [ perMinute 30 IronOre ]
-                , output = perMinute 30 IronIngot
-                }
+            if isOptionActivated IncludeMiner options then
+                Recipe
+                    { machine = Smelter
+                    , input = [ perMinute 30 IronOre ]
+                    , output = perMinute 30 IronIngot
+                    }
+
+            else
+                Recipe
+                    { machine = Smelter
+                    , input = []
+                    , output = perMinute 30 IronIngot
+                    }
 
         CopperIngot ->
-            Recipe
-                { machine = Smelter
-                , input = [ perMinute 30 CopperOre ]
-                , output = perMinute 30 CopperIngot
-                }
+            if isOptionActivated IncludeMiner options then
+                Recipe
+                    { machine = Smelter
+                    , input = [ perMinute 30 CopperOre ]
+                    , output = perMinute 30 CopperIngot
+                    }
+
+            else
+                Recipe
+                    { machine = Smelter
+                    , input = []
+                    , output = perMinute 30 CopperIngot
+                    }
 
 
 
@@ -837,8 +873,8 @@ consumeMachineGroupItems io (MachineGroup group) =
             (setQuantity newQuantity io)
 
 
-addProductionNeeds : ActivatedAltRecipes -> ItemIO -> ProductionLane -> ( ProductionLane, List ItemIO )
-addProductionNeeds activatedAltRecipes io lane =
+addProductionNeeds : RecipesOptions -> ItemIO -> ProductionLane -> ( ProductionLane, List ItemIO )
+addProductionNeeds options io lane =
     let
         itemName =
             intermediateProductText (getProduct io)
@@ -847,7 +883,7 @@ addProductionNeeds activatedAltRecipes io lane =
         Nothing ->
             let
                 group =
-                    itemIOToMachineGroup activatedAltRecipes io
+                    itemIOToMachineGroup options io
             in
             ( Dict.insert itemName group lane, machineGroupInput group )
 
@@ -862,7 +898,7 @@ addProductionNeeds activatedAltRecipes io lane =
                 NoThrougtput missingItemIO ->
                     let
                         newGroup =
-                            itemIOToMachineGroup activatedAltRecipes missingItemIO
+                            itemIOToMachineGroup options missingItemIO
 
                         groupToAdd =
                             addMachineGroup existingGroup newGroup
@@ -870,13 +906,13 @@ addProductionNeeds activatedAltRecipes io lane =
                     ( Dict.insert itemName groupToAdd lane, machineGroupInput newGroup )
 
 
-getProductLaneFor : ActivatedAltRecipes -> List ItemIO -> ProductionLane
-getProductLaneFor activatedAltRecipes io =
-    getProductLaneForHelper activatedAltRecipes io Dict.empty
+getProductLaneFor : RecipesOptions -> List ItemIO -> ProductionLane
+getProductLaneFor options io =
+    getProductLaneForHelper options io Dict.empty
 
 
-getProductLaneForHelper : ActivatedAltRecipes -> List ItemIO -> ProductionLane -> ProductionLane
-getProductLaneForHelper activatedAltRecipes remaining lane =
+getProductLaneForHelper : RecipesOptions -> List ItemIO -> ProductionLane -> ProductionLane
+getProductLaneForHelper options remaining lane =
     case remaining of
         [] ->
             lane
@@ -884,9 +920,9 @@ getProductLaneForHelper activatedAltRecipes remaining lane =
         io :: rest ->
             let
                 ( newLane, missingIO ) =
-                    addProductionNeeds activatedAltRecipes io lane
+                    addProductionNeeds options io lane
             in
-            getProductLaneForHelper activatedAltRecipes (List.append rest missingIO) newLane
+            getProductLaneForHelper options (List.append rest missingIO) newLane
 
 
 
@@ -1146,8 +1182,8 @@ editionLineView { needs } =
         )
 
 
-toggleAltRecipesView : ActivatedAltRecipes -> Element ProductGraphMsg
-toggleAltRecipesView recipes =
+toggleOptionsView : RecipesOptions -> Element ProductGraphMsg
+toggleOptionsView recipes =
     let
         altRecipeView ( key, value ) =
             Input.checkbox []
@@ -1157,9 +1193,11 @@ toggleAltRecipesView recipes =
                 , label = Input.labelRight [] (text key)
                 }
     in
-    column []
-        [ text "Alternative recipes "
-        , column [] (recipes |> Dict.toList |> List.map altRecipeView)
+    column [ Element.spacing (stylesheetSpacing Stylesheet.SmallSpace) ]
+        [ text "Options"
+        , column
+            []
+            (recipes |> Dict.toList |> List.map altRecipeView)
         ]
 
 
@@ -1172,8 +1210,11 @@ viewProductGraph model =
                 |> getProductLaneFor model.altRecipes
     in
     column [ Element.spacing (stylesheetSpacing Stylesheet.RegularSpace) ]
-        [ toggleAltRecipesView model.altRecipes
-        , editionLineView model
+        [ row
+            [ Element.spaceEvenly, Element.width Element.fill ]
+            [ editionLineView model
+            , el [ Element.alignTop ] (toggleOptionsView model.altRecipes)
+            ]
         , productionLaneView lane
         ]
 
