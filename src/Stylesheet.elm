@@ -16,6 +16,7 @@ type ColorPalette
     | GreenColor
     | BlackColor
     | GrayColor
+    | PurpleColor
 
 
 type FontSize
@@ -83,6 +84,9 @@ stylesheetColor palette =
 
         GrayColor ->
             tangoColor Regular Gray
+
+        PurpleColor ->
+            tangoColor Regular Purple
 
 
 stylesheetFontsize : FontSize -> Int

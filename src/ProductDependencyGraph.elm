@@ -5,53 +5,24 @@ import Dict exposing (Dict)
 import Element exposing (Element, column, el, row, text)
 import Element.Font as Font
 import Element.Input as Input
-import Graph exposing (Graph)
-import Html exposing (Html, button, div, input, option, select)
+import Html exposing (button, option, select)
 import Html.Attributes exposing (selected, style, type_, value)
-import Html.Events exposing (onClick, onInput)
+import Html.Events exposing (onInput)
 import List
-import Stylesheet exposing (edges, stylesheetColor, stylesheetFontsize, stylesheetSpacing)
+import Stylesheet exposing (stylesheetColor, stylesheetSpacing)
 
 
 
--- type Transport
---     = BeltMk1
---     | BeltMk2
---     | Pipe
---
---
--- itemPerBelt : Belt -> Int
--- itemPerBelt belt =
---     case belt of
---         BeltMk1 ->
---             60
---
---         BeltMk2 ->
---             120
---
---
--- minimalBeltMkForQuantity : Int -> Belt
--- minimalBeltMkForQuantity quantity =
---     if quantity <= 60 then
---         BeltMk1
---
---     else
---         BeltMk2
-
-
-type alias RecipesOptions =
-    Dict String Bool
+{- Types -}
 
 
 type RecipesOption
     = BoltedModularFrame
+    | QuickwireStator
+    | FusedWire
+    | CopperRotor
     | IncludeMiner
-
-
-type alias ProductGraphModel =
-    { needs : Array ItemIO
-    , altRecipes : RecipesOptions
-    }
+    | SteamedCopperSheet
 
 
 type ProductGraphMsg
@@ -65,6 +36,139 @@ type ProductGraphMsg
 type EnergyGenerator
     = BiomassBurner
     | CoalGenerator
+    | FuelGenerator
+
+
+type AssemblyMachine
+    = Miner
+    | Smelter
+    | Constructor
+    | Assembler
+    | WaterExtractor
+    | OilExtractor
+    | Foundry
+    | Refinery
+
+
+type Recipe
+    = Recipe
+        { machine : AssemblyMachine
+        , input : List ItemIO
+        , output : ItemIO
+        , byproduct : Maybe ItemIO
+        }
+
+
+
+-- type AssemblyMachineV2
+--     = -- Extractor
+--       Miner { output : ItemIO }
+--     | WaterExtractor { output : ItemIO }
+--       -- Furnaces
+--     | Smelter { input : ItemIO, output : ItemIO }
+--     | Foundry { input : ( ItemIO, ItemIO ), output : ItemIO }
+--       -- Transformation
+--     | Constructor { input : ItemIO, output : ItemIO }
+--     | Assembler { input : ( ItemIO, ItemIO ), output : ItemIO }
+--     | Refinery { input : ( ItemIO, Maybe ItemIO ), output : ItemIO, byproduct : Maybe ItemIO }
+--     | Residue
+--
+--
+-- type MachineGroupV2
+--     = MachineGroupV2 { what : AssemblyMachineV2, count : Int, availableThrougtput : ItemIO }
+-- machineGroupInput : MachineGroupV2 -> List ItemIO
+-- machineGroupProduction : MachineGroupV2 -> IntermediateProduct
+
+
+type
+    IntermediateProduct
+    -- Raw
+    = IronOre
+    | CopperOre
+    | Coal
+    | Water
+    | LimeStone
+    | CateriumOre
+      -- Copper
+    | CopperIngot
+    | CopperWire
+    | CopperCable
+    | CopperSheet
+      -- Iron
+    | IronIngot
+    | IronPlate
+    | IronRod
+    | Screw
+    | ReinforcedIronPlate
+      -- Caterium
+    | CateriumIngot
+    | Quickwire
+      -- LimeStone
+    | Concrete
+      -- Advanced Tier1-2
+    | Rotor
+    | ModularFrame
+    | SmartPlating
+      -- Steel
+    | Steel
+    | SteelBeam
+    | SteelPipe
+    | IndustrialSteelBeam
+      -- Advanced Tier3-4
+    | Stator
+    | Motor
+    | VersatileFramework
+    | AutomaticWire
+      -- Oil procecing
+    | Oil
+    | Fuel
+    | Coke
+    | Plastic
+    | Rubber
+    | HeavyOilResidue
+    | PolymerResidue
+
+
+
+-- Merge to principle of machine with the recipe to limit io ?
+
+
+type MachineGroup
+    = MachineGroup
+        { kind : AssemblyMachine
+        , count : Int
+        , availableThrougtput : ItemIO
+        , producing : IntermediateProduct
+        , inputPerMachine : List ItemIO
+        }
+
+
+type alias ProductionLane =
+    Dict String MachineGroup
+
+
+type alias RecipesOptions =
+    Dict String Bool
+
+
+type alias ProductGraphModel =
+    { needs : Array ItemIO
+    , altRecipes : RecipesOptions
+    }
+
+
+allProducts : List IntermediateProduct
+allProducts =
+    [ CopperWire, CopperCable, CopperSheet, IronPlate, IronRod, Screw, ReinforcedIronPlate, Rotor, ModularFrame, SmartPlating, Steel, SteelBeam, SteelPipe, IndustrialSteelBeam, Stator, Motor, VersatileFramework, AutomaticWire, Plastic, Rubber, Fuel ]
+
+
+allOptions : List RecipesOption
+allOptions =
+    [ BoltedModularFrame, IncludeMiner, QuickwireStator, FusedWire, CopperRotor, SteamedCopperSheet ]
+
+
+
+{- Utils -}
 
 
 powerPerGenerator : EnergyGenerator -> MW
@@ -75,6 +179,9 @@ powerPerGenerator generator =
 
         CoalGenerator ->
             MW 75
+
+        FuelGenerator ->
+            MW 150
 
 
 getNeededGenerator : MW -> List ( EnergyGenerator, Int )
@@ -105,6 +212,9 @@ ioPerGenerator generator =
             , ItemIO 45 Water
             ]
 
+        FuelGenerator ->
+            [ ItemIO 15 Oil ]
+
 
 altRecipeText : RecipesOption -> String
 altRecipeText option =
@@ -112,8 +222,20 @@ altRecipeText option =
         BoltedModularFrame ->
             "Bolted Modular Frame"
 
+        FusedWire ->
+            "Fused Wire"
+
+        QuickwireStator ->
+            "Quickwire Stator"
+
+        CopperRotor ->
+            "Copper Rotor"
+
         IncludeMiner ->
             "Include Miners"
+
+        SteamedCopperSheet ->
+            "Steamed Copper Sheet"
 
 
 initProductGraph : ProductGraphModel
@@ -123,77 +245,28 @@ initProductGraph =
     }
 
 
+listFind : (a -> Bool) -> List a -> Maybe a
+listFind fn list =
+    case list of
+        [] ->
+            Nothing
+
+        head :: rest ->
+            if fn head then
+                Just head
+
+            else
+                listFind fn rest
+
+
 parseProduct : String -> Maybe IntermediateProduct
 parseProduct string =
-    case string of
-        "Copper Ingot" ->
-            Just CopperIngot
-
-        "Copper Wire" ->
-            Just CopperWire
-
-        "Copper Sheet" ->
-            Just CopperSheet
-
-        "Iron Ingot" ->
-            Just IronIngot
-
-        "Iron Plate" ->
-            Just IronPlate
-
-        "Iron Rod" ->
-            Just IronRod
-
-        "Screw" ->
-            Just Screw
-
-        "Reinforced Iron Plate" ->
-            Just ReinforcedIronPlate
-
-        "Concrete" ->
-            Just Concrete
-
-        "Rotor" ->
-            Just Rotor
-
-        "Modular Frame" ->
-            Just ModularFrame
-
-        "Smart Plating" ->
-            Just SmartPlating
-
-        "Steel" ->
-            Just Steel
-
-        "Steel Beam" ->
-            Just SteelBeam
-
-        "Steel Pipe" ->
-            Just SteelPipe
-
-        "Industrial Steel Beam" ->
-            Just IndustrialSteelBeam
-
-        "Stator" ->
-            Just Stator
-
-        "Motor" ->
-            Just Motor
-
-        "Versatile Framework" ->
-            Just VersatileFramework
-
-        "Automatic Wire" ->
-            Just AutomaticWire
-
-        "Coal" ->
-            Just Coal
-
-        "Water" ->
-            Just Water
-
-        _ ->
-            Nothing
+    let
+        predicate : IntermediateProduct -> Bool
+        predicate product =
+            intermediateProductText product == string
+    in
+    listFind predicate allProducts
 
 
 onProductUpdate : Int -> String -> ProductGraphMsg
@@ -294,15 +367,6 @@ textMW (MW a) =
         ++ "MW"
 
 
-type AssemblyMachine
-    = MinerMk1
-    | Smelter
-    | Constructor
-    | Assembler
-    | Pump
-    | Foundry
-
-
 machineConsumption : AssemblyMachine -> MW
 machineConsumption machine =
     case machine of
@@ -315,14 +379,20 @@ machineConsumption machine =
         Smelter ->
             MW 12
 
-        Pump ->
+        WaterExtractor ->
             MW 20
 
-        MinerMk1 ->
+        Miner ->
             MW 5
 
         Foundry ->
             MW 16
+
+        Refinery ->
+            MW 30
+
+        OilExtractor ->
+            MW 40
 
 
 type ItemIO
@@ -425,141 +495,32 @@ itemIOToMachineGroup activatedAltRecipes (ItemIO targetQuantity targetItem) =
         |> recipeToMachineGroup
 
 
-type Recipe
-    = Recipe
-        { machine : AssemblyMachine
-        , input : List ItemIO
-        , output : ItemIO
-        }
-
-
-type
-    IntermediateProduct
-    -- Raw
-    = IronOre
-    | CopperOre
-    | Coal
-    | Water
-    | LimeStone
-      -- Copper
-    | CopperIngot
-    | CopperWire
-    | CopperCable
-    | CopperSheet
-      -- Iron
-    | IronIngot
-    | IronPlate
-    | IronRod
-    | Screw
-    | ReinforcedIronPlate
-      -- LimeStone
-    | Concrete
-      -- Advanced Tier1-2
-    | Rotor
-    | ModularFrame
-    | SmartPlating
-      -- Steel
-    | Steel
-    | SteelBeam
-    | SteelPipe
-    | IndustrialSteelBeam
-      -- Advanced Tier3-4
-    | Stator
-    | Motor
-    | VersatileFramework
-    | AutomaticWire
-
-
-allProducts : List IntermediateProduct
-allProducts =
-    [ CopperWire, CopperCable, CopperSheet, IronPlate, IronRod, Screw, ReinforcedIronPlate, Rotor, ModularFrame, SmartPlating, Steel, SteelBeam, SteelPipe, IndustrialSteelBeam, Stator, Motor, VersatileFramework, AutomaticWire ]
-
-
-allOptions : List RecipesOption
-allOptions =
-    [ BoltedModularFrame, IncludeMiner ]
-
-
 getMachingeGroupOrderIndex : MachineGroup -> Int
-getMachingeGroupOrderIndex (MachineGroup { producing }) =
-    case producing of
-        Coal ->
-            100
+getMachingeGroupOrderIndex (MachineGroup { kind }) =
+    case kind of
+        Miner ->
+            10
 
-        Water ->
-            200
+        WaterExtractor ->
+            11
 
-        LimeStone ->
-            1000
+        OilExtractor ->
+            12
 
-        Concrete ->
-            4000
+        Smelter ->
+            20
 
-        CopperOre ->
-            2000
+        Foundry ->
+            21
 
-        CopperIngot ->
-            2050
+        Refinery ->
+            22
 
-        CopperWire ->
-            2200
+        Constructor ->
+            30
 
-        CopperCable ->
-            2300
-
-        CopperSheet ->
-            2100
-
-        IronOre ->
-            3000
-
-        IronIngot ->
-            3050
-
-        IronPlate ->
-            3100
-
-        IronRod ->
-            3200
-
-        Screw ->
-            3300
-
-        ReinforcedIronPlate ->
-            3500
-
-        Rotor ->
-            5200
-
-        ModularFrame ->
-            5300
-
-        SmartPlating ->
-            7100
-
-        Steel ->
-            4100
-
-        SteelBeam ->
-            4200
-
-        SteelPipe ->
-            4300
-
-        IndustrialSteelBeam ->
-            4500
-
-        Stator ->
-            5500
-
-        Motor ->
-            5600
-
-        VersatileFramework ->
-            7200
-
-        AutomaticWire ->
-            7300
+        Assembler ->
+            31
 
 
 isOptionActivated : RecipesOption -> RecipesOptions -> Bool
@@ -578,37 +539,50 @@ getRecipeOf options product =
     case product of
         IronOre ->
             Recipe
-                { machine = MinerMk1
+                { machine = Miner
                 , input = []
                 , output = perMinute 60 IronOre
+                , byproduct = Nothing
                 }
 
         CopperOre ->
             Recipe
-                { machine = MinerMk1
+                { machine = Miner
                 , input = []
                 , output = perMinute 60 CopperOre
+                , byproduct = Nothing
+                }
+
+        CateriumOre ->
+            Recipe
+                { machine = Miner
+                , input = []
+                , output = perMinute 60 CateriumOre
+                , byproduct = Nothing
                 }
 
         Coal ->
             Recipe
-                { machine = MinerMk1
+                { machine = Miner
                 , input = []
                 , output = perMinute 60 Coal
+                , byproduct = Nothing
                 }
 
         Water ->
             Recipe
-                { machine = Pump
+                { machine = WaterExtractor
                 , input = []
                 , output = perMinute 120 Water
+                , byproduct = Nothing
                 }
 
         LimeStone ->
             Recipe
-                { machine = MinerMk1
+                { machine = Miner
                 , input = []
                 , output = perMinute 60 LimeStone
+                , byproduct = Nothing
                 }
 
         Concrete ->
@@ -617,6 +591,7 @@ getRecipeOf options product =
                     { machine = Constructor
                     , input = [ perMinute 45 LimeStone ]
                     , output = perMinute 15 Concrete
+                    , byproduct = Nothing
                     }
 
             else
@@ -624,27 +599,65 @@ getRecipeOf options product =
                     { machine = Constructor
                     , input = []
                     , output = perMinute 15 Concrete
+                    , byproduct = Nothing
                     }
 
-        CopperWire ->
+        CateriumIngot ->
             Recipe
-                { machine = Constructor
-                , input = [ perMinute 15 CopperIngot ]
-                , output = perMinute 30 CopperWire
+                { machine = Smelter
+                , input = [ perMinute 45 CateriumOre ]
+                , output = perMinute 15 CopperIngot
+                , byproduct = Nothing
                 }
 
-        CopperSheet ->
+        Quickwire ->
             Recipe
                 { machine = Constructor
-                , input = [ perMinute 20 CopperIngot ]
-                , output = perMinute 10 CopperSheet
+                , input = [ perMinute 12 CateriumIngot ]
+                , output = perMinute 60 Quickwire
+                , byproduct = Nothing
                 }
+
+        CopperWire ->
+            if isOptionActivated FusedWire options then
+                Recipe
+                    { machine = Assembler
+                    , input = [ perMinute 70 CopperIngot, perMinute 7.5 CateriumIngot ]
+                    , output = perMinute 225 CopperWire
+                    , byproduct = Nothing
+                    }
+
+            else
+                Recipe
+                    { machine = Constructor
+                    , input = [ perMinute 15 CopperIngot ]
+                    , output = perMinute 30 CopperWire
+                    , byproduct = Nothing
+                    }
+
+        CopperSheet ->
+            if isOptionActivated SteamedCopperSheet options then
+                Recipe
+                    { machine = Refinery
+                    , input = [ perMinute 27.5 Water, perMinute 27.5 CopperIngot ]
+                    , output = perMinute 27.5 CopperSheet
+                    , byproduct = Nothing
+                    }
+
+            else
+                Recipe
+                    { machine = Constructor
+                    , input = [ perMinute 20 CopperIngot ]
+                    , output = perMinute 10 CopperSheet
+                    , byproduct = Nothing
+                    }
 
         CopperCable ->
             Recipe
                 { machine = Constructor
                 , input = [ perMinute 60 CopperWire ]
                 , output = perMinute 30 CopperCable
+                , byproduct = Nothing
                 }
 
         IronPlate ->
@@ -652,6 +665,7 @@ getRecipeOf options product =
                 { machine = Constructor
                 , input = [ perMinute 30 IronIngot ]
                 , output = perMinute 20 IronPlate
+                , byproduct = Nothing
                 }
 
         IronRod ->
@@ -659,6 +673,7 @@ getRecipeOf options product =
                 { machine = Constructor
                 , input = [ perMinute 15 IronIngot ]
                 , output = perMinute 15 IronRod
+                , byproduct = Nothing
                 }
 
         Screw ->
@@ -666,6 +681,7 @@ getRecipeOf options product =
                 { machine = Constructor
                 , input = [ perMinute 10 IronRod ]
                 , output = perMinute 40 Screw
+                , byproduct = Nothing
                 }
 
         ReinforcedIronPlate ->
@@ -673,20 +689,32 @@ getRecipeOf options product =
                 { machine = Constructor
                 , input = [ perMinute 30 IronPlate, perMinute 60 Screw ]
                 , output = perMinute 5 ReinforcedIronPlate
+                , byproduct = Nothing
                 }
 
         Rotor ->
-            Recipe
-                { machine = Constructor
-                , input = [ perMinute 20 IronRod, perMinute 100 Screw ]
-                , output = perMinute 4 Rotor
-                }
+            if isOptionActivated CopperRotor options then
+                Recipe
+                    { machine = Assembler
+                    , input = [ perMinute 56.25 CopperSheet, perMinute 487.5 Screw ]
+                    , output = perMinute 28.1 Rotor
+                    , byproduct = Nothing
+                    }
+
+            else
+                Recipe
+                    { machine = Assembler
+                    , input = [ perMinute 20 IronRod, perMinute 100 Screw ]
+                    , output = perMinute 4 Rotor
+                    , byproduct = Nothing
+                    }
 
         SmartPlating ->
             Recipe
                 { machine = Assembler
                 , input = [ perMinute 2 ReinforcedIronPlate, perMinute 2 Rotor ]
                 , output = perMinute 2 SmartPlating
+                , byproduct = Nothing
                 }
 
         ModularFrame ->
@@ -695,6 +723,7 @@ getRecipeOf options product =
                     { machine = Assembler
                     , input = [ perMinute 7.5 ReinforcedIronPlate, perMinute 140 Screw ]
                     , output = perMinute 5 ModularFrame
+                    , byproduct = Nothing
                     }
 
             else
@@ -702,6 +731,7 @@ getRecipeOf options product =
                     { machine = Assembler
                     , input = [ perMinute 3 ReinforcedIronPlate, perMinute 12 IronRod ]
                     , output = perMinute 2 ModularFrame
+                    , byproduct = Nothing
                     }
 
         Steel ->
@@ -710,6 +740,7 @@ getRecipeOf options product =
                     { machine = Foundry
                     , input = [ perMinute 45 IronOre, perMinute 45 Coal ]
                     , output = perMinute 45 Steel
+                    , byproduct = Nothing
                     }
 
             else
@@ -717,6 +748,7 @@ getRecipeOf options product =
                     { machine = Foundry
                     , input = []
                     , output = perMinute 45 Steel
+                    , byproduct = Nothing
                     }
 
         SteelPipe ->
@@ -724,6 +756,7 @@ getRecipeOf options product =
                 { machine = Constructor
                 , input = [ perMinute 30 Steel ]
                 , output = perMinute 20 SteelPipe
+                , byproduct = Nothing
                 }
 
         SteelBeam ->
@@ -731,6 +764,7 @@ getRecipeOf options product =
                 { machine = Constructor
                 , input = [ perMinute 60 Steel ]
                 , output = perMinute 15 SteelBeam
+                , byproduct = Nothing
                 }
 
         IndustrialSteelBeam ->
@@ -738,6 +772,7 @@ getRecipeOf options product =
                 { machine = Assembler
                 , input = [ perMinute 24 Steel, perMinute 30 Concrete ]
                 , output = perMinute 6 IndustrialSteelBeam
+                , byproduct = Nothing
                 }
 
         VersatileFramework ->
@@ -745,6 +780,7 @@ getRecipeOf options product =
                 { machine = Assembler
                 , input = [ perMinute 2.5 ModularFrame, perMinute 30 SteelBeam ]
                 , output = perMinute 5 VersatileFramework
+                , byproduct = Nothing
                 }
 
         AutomaticWire ->
@@ -752,20 +788,32 @@ getRecipeOf options product =
                 { machine = Assembler
                 , input = [ perMinute 2.5 Stator, perMinute 50 CopperWire ]
                 , output = perMinute 2.5 AutomaticWire
+                , byproduct = Nothing
                 }
 
         Stator ->
-            Recipe
-                { machine = Assembler
-                , input = [ perMinute 15 SteelPipe, perMinute 8 CopperWire ]
-                , output = perMinute 5 Stator
-                }
+            if isOptionActivated QuickwireStator options then
+                Recipe
+                    { machine = Assembler
+                    , input = [ perMinute 40 SteelPipe, perMinute 150 Quickwire ]
+                    , output = perMinute 20 Stator
+                    , byproduct = Nothing
+                    }
+
+            else
+                Recipe
+                    { machine = Assembler
+                    , input = [ perMinute 15 SteelPipe, perMinute 8 CopperWire ]
+                    , output = perMinute 5 Stator
+                    , byproduct = Nothing
+                    }
 
         Motor ->
             Recipe
                 { machine = Assembler
                 , input = [ perMinute 10 Rotor, perMinute 10 Stator ]
                 , output = perMinute 5 Motor
+                , byproduct = Nothing
                 }
 
         IronIngot ->
@@ -774,6 +822,7 @@ getRecipeOf options product =
                     { machine = Smelter
                     , input = [ perMinute 30 IronOre ]
                     , output = perMinute 30 IronIngot
+                    , byproduct = Nothing
                     }
 
             else
@@ -781,6 +830,7 @@ getRecipeOf options product =
                     { machine = Smelter
                     , input = []
                     , output = perMinute 30 IronIngot
+                    , byproduct = Nothing
                     }
 
         CopperIngot ->
@@ -789,6 +839,7 @@ getRecipeOf options product =
                     { machine = Smelter
                     , input = [ perMinute 30 CopperOre ]
                     , output = perMinute 30 CopperIngot
+                    , byproduct = Nothing
                     }
 
             else
@@ -796,21 +847,57 @@ getRecipeOf options product =
                     { machine = Smelter
                     , input = []
                     , output = perMinute 30 CopperIngot
+                    , byproduct = Nothing
                     }
 
+        Oil ->
+            Recipe
+                { machine = OilExtractor
+                , input = []
+                , output = perMinute 120 Oil
+                , byproduct = Nothing
+                }
 
+        -- RFuel 60R -> 40
+        Fuel ->
+            Recipe
+                { machine = Refinery
+                , input = [ perMinute 60 Oil ]
+                , output = perMinute 40 Fuel
+                , byproduct = Just (perMinute 30 PolymerResidue)
+                }
 
--- Merge to principle of machine with the recipe to limit io ?
+        -- RPlastic 60PR 20W -> 20
+        Plastic ->
+            Recipe
+                { machine = Refinery
+                , input = [ perMinute 30 Oil ]
+                , output = perMinute 20 Plastic
+                , byproduct = Just (perMinute 10 PolymerResidue)
+                }
 
+        -- RRubber 40PR 40W 20
+        Rubber ->
+            Recipe
+                { machine = Refinery
+                , input = [ perMinute 30 Oil ]
+                , output = perMinute 20 Rubber
+                , byproduct = Just (perMinute 20 PolymerResidue)
+                }
 
-type MachineGroup
-    = MachineGroup
-        { kind : AssemblyMachine
-        , count : Int
-        , availableThrougtput : ItemIO
-        , producing : IntermediateProduct
-        , inputPerMachine : List ItemIO
-        }
+        Coke ->
+            Recipe
+                { machine = Refinery
+                , input = [ perMinute 40 PolymerResidue ]
+                , output = perMinute 120 Coke
+                , byproduct = Nothing
+                }
+
+        HeavyOilResidue ->
+            Recipe { machine = Refinery, input = [], output = perMinute 0 HeavyOilResidue, byproduct = Nothing }
+
+        PolymerResidue ->
+            Recipe { machine = Refinery, input = [], output = perMinute 0 PolymerResidue, byproduct = Nothing }
 
 
 addMachineGroup : MachineGroup -> MachineGroup -> MachineGroup
@@ -828,10 +915,6 @@ machineGroupInput : MachineGroup -> List ItemIO
 machineGroupInput (MachineGroup { inputPerMachine, count }) =
     inputPerMachine
         |> List.map (mulItemIO count)
-
-
-type alias ProductionLane =
-    Dict String MachineGroup
 
 
 hasAvailableThrougput : MachineGroup -> Bool
@@ -1010,6 +1093,36 @@ intermediateProductText product =
         AutomaticWire ->
             "Automatic Wire"
 
+        CateriumOre ->
+            "Caterium Ore"
+
+        CateriumIngot ->
+            "Caterium Ingot"
+
+        Quickwire ->
+            "Quickwire"
+
+        Fuel ->
+            "Fuel"
+
+        Coke ->
+            "Coke"
+
+        Plastic ->
+            "Plastic"
+
+        Rubber ->
+            "Rubber"
+
+        HeavyOilResidue ->
+            "Heavy Oil Residue"
+
+        PolymerResidue ->
+            "Polymer Residue"
+
+        Oil ->
+            "Oil"
+
 
 assemblyMachineText : AssemblyMachine -> String
 assemblyMachineText machine =
@@ -1020,10 +1133,10 @@ assemblyMachineText machine =
         Assembler ->
             "Assembler"
 
-        MinerMk1 ->
-            "Miner Mk1"
+        Miner ->
+            "Miner"
 
-        Pump ->
+        WaterExtractor ->
             "Pump"
 
         Smelter ->
@@ -1031,6 +1144,12 @@ assemblyMachineText machine =
 
         Foundry ->
             "Foundry"
+
+        Refinery ->
+            "Refinery"
+
+        OilExtractor ->
+            "Oil Extractor"
 
 
 itemIOText : ItemIO -> String
@@ -1235,3 +1354,10 @@ viewGenerator generator =
                 , Font.bold
                 ]
                 (text "Coal Generator")
+
+        FuelGenerator ->
+            el
+                [ Font.color (stylesheetColor Stylesheet.PurpleColor)
+                , Font.bold
+                ]
+                (text "Fuel Generator")
