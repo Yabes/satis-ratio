@@ -3,6 +3,8 @@ module ProductDependencyGraph exposing (ProductGraphModel, ProductGraphMsg, init
 import Array exposing (Array)
 import Dict exposing (Dict)
 import Element exposing (Element, column, el, row, text)
+import Element.Background as Background
+import Element.Border as Border
 import Element.Font as Font
 import Element.Input as Input
 import Html exposing (button, option, select)
@@ -145,6 +147,33 @@ recipeOutput recipe =
 
         Residue ->
             Debug.todo "Find a way to avoid Residue in Recipe"
+
+
+recipeByproduct : Recipe -> Maybe ItemIO
+recipeByproduct recipe =
+    case recipe of
+        Refinery { byproduct } ->
+            byproduct
+
+        _ ->
+            Nothing
+
+
+recipeOutputWithByroduct : Recipe -> List ItemIO
+recipeOutputWithByroduct recipe =
+    let
+        out =
+            recipeOutput recipe
+
+        optionalByproduct =
+            recipeByproduct recipe
+    in
+    case optionalByproduct of
+        Nothing ->
+            [ out ]
+
+        Just byproduct ->
+            [ out, byproduct ]
 
 
 machineGroupProduction : MachineGroup -> IntermediateProduct
@@ -429,8 +458,17 @@ textMW (MW a) =
         ++ "MW"
 
 
-machineConsumption : Recipe -> MW
-machineConsumption recipe =
+mwView : MW -> Element msg
+mwView (MW a) =
+    let
+        innerText =
+            String.fromInt a ++ "MW"
+    in
+    el [ Font.bold, Font.color <| stylesheetColor Stylesheet.YellowColor ] (text innerText)
+
+
+recipeConsumption : Recipe -> MW
+recipeConsumption recipe =
     case recipe of
         Assembler _ ->
             MW 15
@@ -1122,7 +1160,64 @@ itemIOText (ItemIO num product) =
         ++ intermediateProductText product
 
 
-machineGroupView : MachineGroup -> Element ProductGraphMsg
+itemIOView : ItemIO -> Element msg
+itemIOView (ItemIO float product) =
+    let
+        quantity =
+            String.fromFloat float
+    in
+    row
+        [ Element.spacing (stylesheetSpacing Stylesheet.SmallSpace) ]
+        [ text quantity, text <| intermediateProductText product ]
+
+
+recipeTooltipView : Recipe -> Element msg
+recipeTooltipView recipe =
+    let
+        consumption =
+            recipeConsumption recipe
+                |> mwView
+
+        ioColumn : List ItemIO -> Element msg
+        ioColumn list =
+            column [] (List.map itemIOView list)
+    in
+    column
+        [ Background.color <| stylesheetColor Stylesheet.WhiteColor
+        , Border.color <| stylesheetColor Stylesheet.BlackColor
+        , Border.rounded 5
+        , Border.width 1
+        , Element.padding <| stylesheetSpacing Stylesheet.SmallSpace
+        , Element.spacing <| stylesheetSpacing Stylesheet.RegularSpace
+        ]
+        [ row [ Element.width Element.fill ]
+            [ el [] (text "per machine:")
+            , el [ Element.alignRight ] consumption
+            ]
+        , row [ Element.spacing <| stylesheetSpacing Stylesheet.LargeSpace ]
+            [ ioColumn <| recipeInput recipe
+            , el [ Element.centerY ] (text "→")
+            , ioColumn <| recipeOutputWithByroduct recipe
+            ]
+        ]
+
+
+tooltip : (Element msg -> Element.Attribute msg) -> Element Never -> Element.Attribute msg
+tooltip usher tooltip_ =
+    Element.inFront <|
+        el
+            [ Element.width Element.fill
+            , Element.height Element.fill
+            , Element.transparent True
+            , Element.mouseOver [ Element.transparent False ]
+            , (usher << Element.map never) <|
+                el [ Element.htmlAttribute (Html.Attributes.style "pointerEvents" "none") ]
+                    tooltip_
+            ]
+            Element.none
+
+
+machineGroupView : MachineGroup -> Element msg
 machineGroupView (MachineGroup { what, count, availableThrougtput }) =
     let
         remaining =
@@ -1134,7 +1229,7 @@ machineGroupView (MachineGroup { what, count, availableThrougtput }) =
     in
     row [ Element.spacing (stylesheetSpacing Stylesheet.SmallSpace) ]
         [ text (String.fromInt count)
-        , el [ Font.light ] (text (assemblyMachineText what))
+        , el [ Font.light, tooltip Element.above (recipeTooltipView what), Element.pointer ] (text (assemblyMachineText what))
         , text "producing"
         , el [ Font.light ] (text (intermediateProductText <| getProduct <| recipeOutput <| what))
         , text remaining
@@ -1154,7 +1249,7 @@ productionLaneView lane =
 
         addConsumption _ (MachineGroup { what, count }) mw =
             what
-                |> machineConsumption
+                |> recipeConsumption
                 |> mulMW count
                 |> addMW mw
 
@@ -1170,10 +1265,8 @@ productionLaneView lane =
     column [ Element.spacing (stylesheetSpacing Stylesheet.SmallSpace) ]
         [ row
             [ Element.spacing (stylesheetSpacing Stylesheet.SmallSpace) ]
-            [ text
-                ("Total consumption: "
-                    ++ textMW totalConsumption
-                )
+            [ text "Total consumption:"
+            , mwView totalConsumption
             , getNeededGenerator totalConsumption
                 |> List.map neededGeneratorView
                 |> List.intersperse (text " / ")
