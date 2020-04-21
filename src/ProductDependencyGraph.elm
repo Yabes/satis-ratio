@@ -21,7 +21,7 @@ type RecipesOption
     | QuickwireStator
     | FusedWire
     | CopperRotor
-    | IncludeMiner
+    | IncludeResourceExtractor
     | SteamedCopperSheet
 
 
@@ -226,7 +226,7 @@ allProducts =
 
 allOptions : List RecipesOption
 allOptions =
-    [ BoltedModularFrame, IncludeMiner, QuickwireStator, FusedWire, CopperRotor, SteamedCopperSheet ]
+    [ BoltedModularFrame, IncludeResourceExtractor, QuickwireStator, FusedWire, CopperRotor, SteamedCopperSheet ]
 
 
 
@@ -293,8 +293,8 @@ altRecipeText option =
         CopperRotor ->
             "Copper Rotor"
 
-        IncludeMiner ->
-            "Include Miners"
+        IncludeResourceExtractor ->
+            "Include Resorce Extractor"
 
         SteamedCopperSheet ->
             "Steamed Copper Sheet"
@@ -884,6 +884,35 @@ consumeMachineGroupItems io (MachineGroup group) =
             (setQuantity newQuantity io)
 
 
+removeUnwantedItem : RecipesOptions -> ItemIO -> Bool
+removeUnwantedItem options (ItemIO _ item) =
+    if isOptionActivated IncludeResourceExtractor options then
+        True
+
+    else
+        case item of
+            LimeStone ->
+                False
+
+            IronOre ->
+                False
+
+            CopperOre ->
+                False
+
+            Water ->
+                False
+
+            Oil ->
+                False
+
+            Coal ->
+                False
+
+            _ ->
+                True
+
+
 addProductionNeeds : RecipesOptions -> ItemIO -> ProductionLane -> ( ProductionLane, List ItemIO )
 addProductionNeeds options io lane =
     let
@@ -932,8 +961,11 @@ getProductLaneForHelper options remaining lane =
             let
                 ( newLane, missingIO ) =
                     addProductionNeeds options io lane
+
+                filteredMissingIO =
+                    List.filter (removeUnwantedItem options) missingIO
             in
-            getProductLaneForHelper options (List.append rest missingIO) newLane
+            getProductLaneForHelper options (List.append rest filteredMissingIO) newLane
 
 
 
