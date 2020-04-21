@@ -39,45 +39,121 @@ type EnergyGenerator
     | FuelGenerator
 
 
-type AssemblyMachine
-    = Miner
-    | Smelter
-    | Constructor
-    | Assembler
-    | WaterExtractor
-    | OilExtractor
-    | Foundry
-    | Refinery
-
-
 type Recipe
-    = Recipe
-        { machine : AssemblyMachine
-        , input : List ItemIO
-        , output : ItemIO
-        , byproduct : Maybe ItemIO
+    = -- Extractor
+      Miner ItemIO
+    | WaterExtractor ItemIO
+    | OilExtractor ItemIO
+      -- Furnaces
+    | Smelter { input : ItemIO, output : ItemIO }
+    | Foundry { input : ( ItemIO, ItemIO ), output : ItemIO }
+      -- Transformation
+    | Constructor { input : ItemIO, output : ItemIO }
+    | Assembler { input : ( ItemIO, ItemIO ), output : ItemIO }
+    | Refinery { input : ( ItemIO, Maybe ItemIO ), output : ItemIO, byproduct : Maybe ItemIO }
+    | Residue
+
+
+type MachineGroup
+    = MachineGroup
+        { what : Recipe
+        , count : Int
+        , availableThrougtput : ItemIO
         }
 
 
+recipeInput : Recipe -> List ItemIO
+recipeInput recipe =
+    let
+        tupleToList tuple =
+            let
+                ( a, b ) =
+                    tuple
+            in
+            [ a, b ]
 
--- type AssemblyMachineV2
---     = -- Extractor
---       Miner { output : ItemIO }
---     | WaterExtractor { output : ItemIO }
---       -- Furnaces
---     | Smelter { input : ItemIO, output : ItemIO }
---     | Foundry { input : ( ItemIO, ItemIO ), output : ItemIO }
---       -- Transformation
---     | Constructor { input : ItemIO, output : ItemIO }
---     | Assembler { input : ( ItemIO, ItemIO ), output : ItemIO }
---     | Refinery { input : ( ItemIO, Maybe ItemIO ), output : ItemIO, byproduct : Maybe ItemIO }
---     | Residue
---
---
--- type MachineGroupV2
---     = MachineGroupV2 { what : AssemblyMachineV2, count : Int, availableThrougtput : ItemIO }
--- machineGroupInput : MachineGroupV2 -> List ItemIO
--- machineGroupProduction : MachineGroupV2 -> IntermediateProduct
+        optionalTupleToList tuple =
+            case tuple of
+                ( a, Nothing ) ->
+                    [ a ]
+
+                ( a, Just b ) ->
+                    [ a, b ]
+    in
+    case recipe of
+        Miner _ ->
+            []
+
+        WaterExtractor _ ->
+            []
+
+        OilExtractor _ ->
+            []
+
+        Smelter { input } ->
+            [ input ]
+
+        Foundry { input } ->
+            tupleToList input
+
+        Constructor { input } ->
+            [ input ]
+
+        Assembler { input } ->
+            tupleToList input
+
+        Refinery { input } ->
+            optionalTupleToList input
+
+        Residue ->
+            Debug.todo ""
+
+
+machineGroupInput : MachineGroup -> List ItemIO
+machineGroupInput (MachineGroup { what, count }) =
+    what
+        |> recipeInput
+        |> List.map (mulItemIO count)
+
+
+recipeOutput : Recipe -> ItemIO
+recipeOutput recipe =
+    case recipe of
+        Miner output ->
+            output
+
+        WaterExtractor output ->
+            output
+
+        OilExtractor output ->
+            output
+
+        Smelter { output } ->
+            output
+
+        Foundry { output } ->
+            output
+
+        Constructor { output } ->
+            output
+
+        Assembler { output } ->
+            output
+
+        Refinery { output } ->
+            output
+
+        Residue ->
+            Debug.todo "Find a way to avoid Residue in Recipe"
+
+
+machineGroupProduction : MachineGroup -> IntermediateProduct
+machineGroupProduction (MachineGroup { what }) =
+    let
+        (ItemIO _ product) =
+            recipeOutput what
+    in
+    product
 
 
 type
@@ -127,20 +203,6 @@ type
     | Rubber
     | HeavyOilResidue
     | PolymerResidue
-
-
-
--- Merge to principle of machine with the recipe to limit io ?
-
-
-type MachineGroup
-    = MachineGroup
-        { kind : AssemblyMachine
-        , count : Int
-        , availableThrougtput : ItemIO
-        , producing : IntermediateProduct
-        , inputPerMachine : List ItemIO
-        }
 
 
 type alias ProductionLane =
@@ -367,32 +429,35 @@ textMW (MW a) =
         ++ "MW"
 
 
-machineConsumption : AssemblyMachine -> MW
-machineConsumption machine =
-    case machine of
-        Assembler ->
+machineConsumption : Recipe -> MW
+machineConsumption recipe =
+    case recipe of
+        Assembler _ ->
             MW 15
 
-        Constructor ->
+        Constructor _ ->
             MW 4
 
-        Smelter ->
+        Smelter _ ->
             MW 12
 
-        WaterExtractor ->
+        WaterExtractor _ ->
             MW 20
 
-        Miner ->
+        Miner _ ->
             MW 5
 
-        Foundry ->
+        Foundry _ ->
             MW 16
 
-        Refinery ->
+        Refinery _ ->
             MW 30
 
-        OilExtractor ->
+        OilExtractor _ ->
             MW 40
+
+        Residue ->
+            Debug.todo ""
 
 
 type ItemIO
@@ -465,10 +530,10 @@ itemIOToMachineGroup : RecipesOptions -> ItemIO -> MachineGroup
 itemIOToMachineGroup activatedAltRecipes (ItemIO targetQuantity targetItem) =
     let
         recipeToMachineGroup : Recipe -> MachineGroup
-        recipeToMachineGroup (Recipe { machine, output, input }) =
+        recipeToMachineGroup recipe =
             let
                 perMachineQuantity =
-                    getQuantity output
+                    getQuantity (recipeOutput recipe)
 
                 machineNeeded =
                     targetQuantity
@@ -484,11 +549,9 @@ itemIOToMachineGroup activatedAltRecipes (ItemIO targetQuantity targetItem) =
                     ItemIO rest targetItem
             in
             MachineGroup
-                { kind = machine
+                { what = recipe
                 , count = machineNeeded
                 , availableThrougtput = thougtput
-                , producing = targetItem
-                , inputPerMachine = input
                 }
     in
     getRecipeOf activatedAltRecipes targetItem
@@ -496,31 +559,34 @@ itemIOToMachineGroup activatedAltRecipes (ItemIO targetQuantity targetItem) =
 
 
 getMachingeGroupOrderIndex : MachineGroup -> Int
-getMachingeGroupOrderIndex (MachineGroup { kind }) =
-    case kind of
-        Miner ->
+getMachingeGroupOrderIndex (MachineGroup { what }) =
+    case what of
+        Miner _ ->
             10
 
-        WaterExtractor ->
+        WaterExtractor _ ->
             11
 
-        OilExtractor ->
+        OilExtractor _ ->
             12
 
-        Smelter ->
+        Smelter _ ->
             20
 
-        Foundry ->
+        Foundry _ ->
             21
 
-        Refinery ->
+        Refinery _ ->
             22
 
-        Constructor ->
+        Constructor _ ->
             30
 
-        Assembler ->
+        Assembler _ ->
             31
+
+        Residue ->
+            Debug.todo ""
 
 
 isOptionActivated : RecipesOption -> RecipesOptions -> Bool
@@ -538,383 +604,245 @@ getRecipeOf : RecipesOptions -> IntermediateProduct -> Recipe
 getRecipeOf options product =
     case product of
         IronOre ->
-            Recipe
-                { machine = Miner
-                , input = []
-                , output = perMinute 60 IronOre
-                , byproduct = Nothing
-                }
+            Miner <| perMinute 60 IronOre
 
         CopperOre ->
-            Recipe
-                { machine = Miner
-                , input = []
-                , output = perMinute 60 CopperOre
-                , byproduct = Nothing
-                }
+            Miner <| perMinute 60 CopperOre
 
         CateriumOre ->
-            Recipe
-                { machine = Miner
-                , input = []
-                , output = perMinute 60 CateriumOre
-                , byproduct = Nothing
-                }
+            Miner <| perMinute 60 CateriumOre
 
         Coal ->
-            Recipe
-                { machine = Miner
-                , input = []
-                , output = perMinute 60 Coal
-                , byproduct = Nothing
-                }
+            Miner <| perMinute 60 Coal
 
         Water ->
-            Recipe
-                { machine = WaterExtractor
-                , input = []
-                , output = perMinute 120 Water
-                , byproduct = Nothing
-                }
+            WaterExtractor <| perMinute 120 Water
 
         LimeStone ->
-            Recipe
-                { machine = Miner
-                , input = []
-                , output = perMinute 60 LimeStone
-                , byproduct = Nothing
-                }
+            Miner <| perMinute 60 LimeStone
 
         Concrete ->
-            if isOptionActivated IncludeMiner options then
-                Recipe
-                    { machine = Constructor
-                    , input = [ perMinute 45 LimeStone ]
-                    , output = perMinute 15 Concrete
-                    , byproduct = Nothing
-                    }
-
-            else
-                Recipe
-                    { machine = Constructor
-                    , input = []
-                    , output = perMinute 15 Concrete
-                    , byproduct = Nothing
-                    }
+            Constructor
+                { input = perMinute 45 LimeStone
+                , output = perMinute 15 Concrete
+                }
 
         CateriumIngot ->
-            Recipe
-                { machine = Smelter
-                , input = [ perMinute 45 CateriumOre ]
+            Smelter
+                { input = perMinute 45 CateriumOre
                 , output = perMinute 15 CopperIngot
-                , byproduct = Nothing
                 }
 
         Quickwire ->
-            Recipe
-                { machine = Constructor
-                , input = [ perMinute 12 CateriumIngot ]
+            Constructor
+                { input = perMinute 12 CateriumIngot
                 , output = perMinute 60 Quickwire
-                , byproduct = Nothing
                 }
 
         CopperWire ->
             if isOptionActivated FusedWire options then
-                Recipe
-                    { machine = Assembler
-                    , input = [ perMinute 70 CopperIngot, perMinute 7.5 CateriumIngot ]
+                Assembler
+                    { input = ( perMinute 70 CopperIngot, perMinute 7.5 CateriumIngot )
                     , output = perMinute 225 CopperWire
-                    , byproduct = Nothing
                     }
 
             else
-                Recipe
-                    { machine = Constructor
-                    , input = [ perMinute 15 CopperIngot ]
+                Constructor
+                    { input = perMinute 15 CopperIngot
                     , output = perMinute 30 CopperWire
-                    , byproduct = Nothing
                     }
 
         CopperSheet ->
             if isOptionActivated SteamedCopperSheet options then
-                Recipe
-                    { machine = Refinery
-                    , input = [ perMinute 27.5 Water, perMinute 27.5 CopperIngot ]
+                Refinery
+                    { input = ( perMinute 27.5 Water, Just <| perMinute 27.5 CopperIngot )
                     , output = perMinute 27.5 CopperSheet
                     , byproduct = Nothing
                     }
 
             else
-                Recipe
-                    { machine = Constructor
-                    , input = [ perMinute 20 CopperIngot ]
+                Constructor
+                    { input = perMinute 20 CopperIngot
                     , output = perMinute 10 CopperSheet
-                    , byproduct = Nothing
                     }
 
         CopperCable ->
-            Recipe
-                { machine = Constructor
-                , input = [ perMinute 60 CopperWire ]
+            Constructor
+                { input = perMinute 60 CopperWire
                 , output = perMinute 30 CopperCable
-                , byproduct = Nothing
                 }
 
         IronPlate ->
-            Recipe
-                { machine = Constructor
-                , input = [ perMinute 30 IronIngot ]
+            Constructor
+                { input = perMinute 30 IronIngot
                 , output = perMinute 20 IronPlate
-                , byproduct = Nothing
                 }
 
         IronRod ->
-            Recipe
-                { machine = Constructor
-                , input = [ perMinute 15 IronIngot ]
+            Constructor
+                { input = perMinute 15 IronIngot
                 , output = perMinute 15 IronRod
-                , byproduct = Nothing
                 }
 
         Screw ->
-            Recipe
-                { machine = Constructor
-                , input = [ perMinute 10 IronRod ]
+            Constructor
+                { input = perMinute 10 IronRod
                 , output = perMinute 40 Screw
-                , byproduct = Nothing
                 }
 
         ReinforcedIronPlate ->
-            Recipe
-                { machine = Constructor
-                , input = [ perMinute 30 IronPlate, perMinute 60 Screw ]
+            Assembler
+                { input = ( perMinute 30 IronPlate, perMinute 60 Screw )
                 , output = perMinute 5 ReinforcedIronPlate
-                , byproduct = Nothing
                 }
 
         Rotor ->
             if isOptionActivated CopperRotor options then
-                Recipe
-                    { machine = Assembler
-                    , input = [ perMinute 56.25 CopperSheet, perMinute 487.5 Screw ]
+                Assembler
+                    { input = ( perMinute 56.25 CopperSheet, perMinute 487.5 Screw )
                     , output = perMinute 28.1 Rotor
-                    , byproduct = Nothing
                     }
 
             else
-                Recipe
-                    { machine = Assembler
-                    , input = [ perMinute 20 IronRod, perMinute 100 Screw ]
+                Assembler
+                    { input = ( perMinute 20 IronRod, perMinute 100 Screw )
                     , output = perMinute 4 Rotor
-                    , byproduct = Nothing
                     }
 
         SmartPlating ->
-            Recipe
-                { machine = Assembler
-                , input = [ perMinute 2 ReinforcedIronPlate, perMinute 2 Rotor ]
+            Assembler
+                { input = ( perMinute 2 ReinforcedIronPlate, perMinute 2 Rotor )
                 , output = perMinute 2 SmartPlating
-                , byproduct = Nothing
                 }
 
         ModularFrame ->
             if isOptionActivated BoltedModularFrame options then
-                Recipe
-                    { machine = Assembler
-                    , input = [ perMinute 7.5 ReinforcedIronPlate, perMinute 140 Screw ]
+                Assembler
+                    { input = ( perMinute 7.5 ReinforcedIronPlate, perMinute 140 Screw )
                     , output = perMinute 5 ModularFrame
-                    , byproduct = Nothing
                     }
 
             else
-                Recipe
-                    { machine = Assembler
-                    , input = [ perMinute 3 ReinforcedIronPlate, perMinute 12 IronRod ]
+                Assembler
+                    { input = ( perMinute 3 ReinforcedIronPlate, perMinute 12 IronRod )
                     , output = perMinute 2 ModularFrame
-                    , byproduct = Nothing
                     }
 
         Steel ->
-            if isOptionActivated IncludeMiner options then
-                Recipe
-                    { machine = Foundry
-                    , input = [ perMinute 45 IronOre, perMinute 45 Coal ]
-                    , output = perMinute 45 Steel
-                    , byproduct = Nothing
-                    }
-
-            else
-                Recipe
-                    { machine = Foundry
-                    , input = []
-                    , output = perMinute 45 Steel
-                    , byproduct = Nothing
-                    }
+            Foundry
+                { input = ( perMinute 45 IronOre, perMinute 45 Coal )
+                , output = perMinute 45 Steel
+                }
 
         SteelPipe ->
-            Recipe
-                { machine = Constructor
-                , input = [ perMinute 30 Steel ]
+            Constructor
+                { input = perMinute 30 Steel
                 , output = perMinute 20 SteelPipe
-                , byproduct = Nothing
                 }
 
         SteelBeam ->
-            Recipe
-                { machine = Constructor
-                , input = [ perMinute 60 Steel ]
+            Constructor
+                { input = perMinute 60 Steel
                 , output = perMinute 15 SteelBeam
-                , byproduct = Nothing
                 }
 
         IndustrialSteelBeam ->
-            Recipe
-                { machine = Assembler
-                , input = [ perMinute 24 Steel, perMinute 30 Concrete ]
+            Assembler
+                { input = ( perMinute 24 Steel, perMinute 30 Concrete )
                 , output = perMinute 6 IndustrialSteelBeam
-                , byproduct = Nothing
                 }
 
         VersatileFramework ->
-            Recipe
-                { machine = Assembler
-                , input = [ perMinute 2.5 ModularFrame, perMinute 30 SteelBeam ]
+            Assembler
+                { input = ( perMinute 2.5 ModularFrame, perMinute 30 SteelBeam )
                 , output = perMinute 5 VersatileFramework
-                , byproduct = Nothing
                 }
 
         AutomaticWire ->
-            Recipe
-                { machine = Assembler
-                , input = [ perMinute 2.5 Stator, perMinute 50 CopperWire ]
+            Assembler
+                { input = ( perMinute 2.5 Stator, perMinute 50 CopperWire )
                 , output = perMinute 2.5 AutomaticWire
-                , byproduct = Nothing
                 }
 
         Stator ->
             if isOptionActivated QuickwireStator options then
-                Recipe
-                    { machine = Assembler
-                    , input = [ perMinute 40 SteelPipe, perMinute 150 Quickwire ]
+                Assembler
+                    { input = ( perMinute 40 SteelPipe, perMinute 150 Quickwire )
                     , output = perMinute 20 Stator
-                    , byproduct = Nothing
                     }
 
             else
-                Recipe
-                    { machine = Assembler
-                    , input = [ perMinute 15 SteelPipe, perMinute 8 CopperWire ]
+                Assembler
+                    { input = ( perMinute 15 SteelPipe, perMinute 8 CopperWire )
                     , output = perMinute 5 Stator
-                    , byproduct = Nothing
                     }
 
         Motor ->
-            Recipe
-                { machine = Assembler
-                , input = [ perMinute 10 Rotor, perMinute 10 Stator ]
+            Assembler
+                { input = ( perMinute 10 Rotor, perMinute 10 Stator )
                 , output = perMinute 5 Motor
-                , byproduct = Nothing
                 }
 
         IronIngot ->
-            if isOptionActivated IncludeMiner options then
-                Recipe
-                    { machine = Smelter
-                    , input = [ perMinute 30 IronOre ]
-                    , output = perMinute 30 IronIngot
-                    , byproduct = Nothing
-                    }
-
-            else
-                Recipe
-                    { machine = Smelter
-                    , input = []
-                    , output = perMinute 30 IronIngot
-                    , byproduct = Nothing
-                    }
+            Smelter
+                { input = perMinute 30 IronOre
+                , output = perMinute 30 IronIngot
+                }
 
         CopperIngot ->
-            if isOptionActivated IncludeMiner options then
-                Recipe
-                    { machine = Smelter
-                    , input = [ perMinute 30 CopperOre ]
-                    , output = perMinute 30 CopperIngot
-                    , byproduct = Nothing
-                    }
-
-            else
-                Recipe
-                    { machine = Smelter
-                    , input = []
-                    , output = perMinute 30 CopperIngot
-                    , byproduct = Nothing
-                    }
+            Smelter
+                { input = perMinute 30 CopperOre
+                , output = perMinute 30 CopperIngot
+                }
 
         Oil ->
-            Recipe
-                { machine = OilExtractor
-                , input = []
-                , output = perMinute 120 Oil
-                , byproduct = Nothing
-                }
+            OilExtractor <| perMinute 120 Oil
 
         -- RFuel 60R -> 40
         Fuel ->
-            Recipe
-                { machine = Refinery
-                , input = [ perMinute 60 Oil ]
+            Refinery
+                { input = ( perMinute 60 Oil, Nothing )
                 , output = perMinute 40 Fuel
                 , byproduct = Just (perMinute 30 PolymerResidue)
                 }
 
         -- RPlastic 60PR 20W -> 20
         Plastic ->
-            Recipe
-                { machine = Refinery
-                , input = [ perMinute 30 Oil ]
+            Refinery
+                { input = ( perMinute 30 Oil, Nothing )
                 , output = perMinute 20 Plastic
                 , byproduct = Just (perMinute 10 PolymerResidue)
                 }
 
         -- RRubber 40PR 40W 20
         Rubber ->
-            Recipe
-                { machine = Refinery
-                , input = [ perMinute 30 Oil ]
+            Refinery
+                { input = ( perMinute 30 Oil, Nothing )
                 , output = perMinute 20 Rubber
                 , byproduct = Just (perMinute 20 PolymerResidue)
                 }
 
         Coke ->
-            Recipe
-                { machine = Refinery
-                , input = [ perMinute 40 PolymerResidue ]
+            Refinery
+                { input = ( perMinute 40 PolymerResidue, Nothing )
                 , output = perMinute 120 Coke
                 , byproduct = Nothing
                 }
 
         HeavyOilResidue ->
-            Recipe { machine = Refinery, input = [], output = perMinute 0 HeavyOilResidue, byproduct = Nothing }
+            Residue
 
         PolymerResidue ->
-            Recipe { machine = Refinery, input = [], output = perMinute 0 PolymerResidue, byproduct = Nothing }
+            Residue
 
 
 addMachineGroup : MachineGroup -> MachineGroup -> MachineGroup
 addMachineGroup (MachineGroup a) (MachineGroup b) =
     MachineGroup
-        { kind = a.kind
-        , inputPerMachine = a.inputPerMachine
+        { what = a.what
         , count = a.count + b.count
         , availableThrougtput = addItemIO a.availableThrougtput b.availableThrougtput
-        , producing = a.producing
         }
-
-
-machineGroupInput : MachineGroup -> List ItemIO
-machineGroupInput (MachineGroup { inputPerMachine, count }) =
-    inputPerMachine
-        |> List.map (mulItemIO count)
 
 
 hasAvailableThrougput : MachineGroup -> Bool
@@ -1124,32 +1052,35 @@ intermediateProductText product =
             "Oil"
 
 
-assemblyMachineText : AssemblyMachine -> String
-assemblyMachineText machine =
-    case machine of
-        Constructor ->
+assemblyMachineText : Recipe -> String
+assemblyMachineText recipe =
+    case recipe of
+        Constructor _ ->
             "Constructor"
 
-        Assembler ->
+        Assembler _ ->
             "Assembler"
 
-        Miner ->
+        Miner _ ->
             "Miner"
 
-        WaterExtractor ->
+        WaterExtractor _ ->
             "Pump"
 
-        Smelter ->
+        Smelter _ ->
             "Smelter"
 
-        Foundry ->
+        Foundry _ ->
             "Foundry"
 
-        Refinery ->
+        Refinery _ ->
             "Refinery"
 
-        OilExtractor ->
+        OilExtractor _ ->
             "Oil Extractor"
+
+        Residue ->
+            Debug.todo ""
 
 
 itemIOText : ItemIO -> String
@@ -1160,7 +1091,7 @@ itemIOText (ItemIO num product) =
 
 
 machineGroupView : MachineGroup -> Element ProductGraphMsg
-machineGroupView (MachineGroup { kind, count, availableThrougtput, producing }) =
+machineGroupView (MachineGroup { what, count, availableThrougtput }) =
     let
         remaining =
             if emptyItemIO availableThrougtput then
@@ -1171,9 +1102,9 @@ machineGroupView (MachineGroup { kind, count, availableThrougtput, producing }) 
     in
     row [ Element.spacing (stylesheetSpacing Stylesheet.SmallSpace) ]
         [ text (String.fromInt count)
-        , el [ Font.light ] (text (assemblyMachineText kind))
+        , el [ Font.light ] (text (assemblyMachineText what))
         , text "producing"
-        , el [ Font.light ] (text (intermediateProductText producing))
+        , el [ Font.light ] (text (intermediateProductText <| getProduct <| recipeOutput <| what))
         , text remaining
         ]
 
@@ -1189,8 +1120,8 @@ productionLaneView lane =
         wrapGroupViewInLi group =
             row [] [ machineGroupView group ]
 
-        addConsumption _ (MachineGroup { kind, count }) mw =
-            kind
+        addConsumption _ (MachineGroup { what, count }) mw =
+            what
                 |> machineConsumption
                 |> mulMW count
                 |> addMW mw
