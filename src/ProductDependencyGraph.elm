@@ -226,7 +226,7 @@ allProducts =
 
 allOptions : List RecipesOption
 allOptions =
-    [ BoltedModularFrame, IncludeResourceExtractor, QuickwireStator, FusedWire, CopperRotor, SteamedCopperSheet ]
+    [ IncludeResourceExtractor, BoltedModularFrame, QuickwireStator, FusedWire, CopperRotor, SteamedCopperSheet ]
 
 
 
@@ -1294,7 +1294,7 @@ viewProductGraph model =
     column [ Element.spacing (stylesheetSpacing Stylesheet.RegularSpace) ]
         [ row
             [ Element.spaceEvenly, Element.width Element.fill ]
-            [ editionLineView model
+            [ el [ Element.alignTop ] (editionLineView model)
             , el [ Element.alignTop ] (toggleOptionsView model.altRecipes)
             ]
         , productionLaneView lane
