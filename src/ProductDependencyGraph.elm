@@ -18,21 +18,14 @@ import Stylesheet exposing (stylesheetColor, stylesheetSpacing)
 {- Types -}
 
 
-type RecipesOption
-    = BoltedModularFrame
-    | QuickwireStator
-    | FusedWire
-    | CopperRotor
-    | IncludeResourceExtractor
-    | SteamedCopperSheet
-
-
 type ProductGraphMsg
     = SelectProduct Int IntermediateProduct
     | UpdateQuantity Int Float
     | AddProductNeed
     | RemoveProductNeed Int
     | UpdateAltRecipe String Bool
+    | UpdateProductionOption String Bool
+    | UpdateByProducts ByproductUsage
 
 
 type EnergyGenerator
@@ -62,6 +55,111 @@ type MachineGroup
         , count : Int
         , availableThrougtput : ItemIO
         }
+
+
+type
+    IntermediateProduct
+    -- Raw
+    = IronOre
+    | CopperOre
+    | Coal
+    | Water
+    | LimeStone
+    | CateriumOre
+      -- Copper
+    | CopperIngot
+    | CopperWire
+    | CopperCable
+    | CopperSheet
+      -- Iron
+    | IronIngot
+    | IronPlate
+    | IronRod
+    | Screw
+    | ReinforcedIronPlate
+      -- Caterium
+    | CateriumIngot
+    | Quickwire
+      -- LimeStone
+    | Concrete
+      -- Advanced Tier1-2
+    | Rotor
+    | ModularFrame
+    | SmartPlating
+      -- Steel
+    | Steel
+    | SteelBeam
+    | SteelPipe
+    | IndustrialSteelBeam
+      -- Advanced Tier3-4
+    | Stator
+    | Motor
+    | VersatileFramework
+    | AutomaticWire
+      -- Oil procecing
+    | Oil
+    | Fuel
+    | Coke
+    | Plastic
+    | Rubber
+    | HeavyOilResidue
+    | PolymerResidue
+
+
+type AltRecipe
+    = BoltedModularFrame
+    | QuickwireStator
+    | FusedWire
+    | CopperRotor
+    | SteamedCopperSheet
+
+
+type ProductionOption
+    = IncludeResourceExtractor
+
+
+type ByproductUsage
+    = None
+    | Balanced { heavyOilResidueRatio : Float, polymerResidueRatio : Float }
+
+
+type alias ProductionLane =
+    Dict String MachineGroup
+
+
+type alias ActivatedAltRecipes =
+    Dict String Bool
+
+
+type alias ProductionOptions =
+    Dict String Bool
+
+
+type alias ProductGraphModel =
+    { needs : Array ItemIO
+    , altRecipes : ActivatedAltRecipes
+    , productionOptions : ProductionOptions
+    , byproductUsage : ByproductUsage
+    }
+
+
+allProducts : List IntermediateProduct
+allProducts =
+    [ CopperWire, CopperCable, CopperSheet, IronPlate, IronRod, Screw, ReinforcedIronPlate, Rotor, ModularFrame, SmartPlating, Steel, SteelBeam, SteelPipe, IndustrialSteelBeam, Stator, Motor, VersatileFramework, AutomaticWire, Plastic, Rubber, Fuel ]
+
+
+allAltRecipes : List AltRecipe
+allAltRecipes =
+    [ BoltedModularFrame, QuickwireStator, FusedWire, CopperRotor, SteamedCopperSheet ]
+
+
+allProductionOptions : List ProductionOption
+allProductionOptions =
+    [ IncludeResourceExtractor ]
+
+
+
+{- Utils -}
 
 
 recipeInput : Recipe -> List ItemIO
@@ -185,83 +283,6 @@ machineGroupProduction (MachineGroup { what }) =
     product
 
 
-type
-    IntermediateProduct
-    -- Raw
-    = IronOre
-    | CopperOre
-    | Coal
-    | Water
-    | LimeStone
-    | CateriumOre
-      -- Copper
-    | CopperIngot
-    | CopperWire
-    | CopperCable
-    | CopperSheet
-      -- Iron
-    | IronIngot
-    | IronPlate
-    | IronRod
-    | Screw
-    | ReinforcedIronPlate
-      -- Caterium
-    | CateriumIngot
-    | Quickwire
-      -- LimeStone
-    | Concrete
-      -- Advanced Tier1-2
-    | Rotor
-    | ModularFrame
-    | SmartPlating
-      -- Steel
-    | Steel
-    | SteelBeam
-    | SteelPipe
-    | IndustrialSteelBeam
-      -- Advanced Tier3-4
-    | Stator
-    | Motor
-    | VersatileFramework
-    | AutomaticWire
-      -- Oil procecing
-    | Oil
-    | Fuel
-    | Coke
-    | Plastic
-    | Rubber
-    | HeavyOilResidue
-    | PolymerResidue
-
-
-type alias ProductionLane =
-    Dict String MachineGroup
-
-
-type alias RecipesOptions =
-    Dict String Bool
-
-
-type alias ProductGraphModel =
-    { needs : Array ItemIO
-    , altRecipes : RecipesOptions
-    }
-
-
-allProducts : List IntermediateProduct
-allProducts =
-    [ CopperWire, CopperCable, CopperSheet, IronPlate, IronRod, Screw, ReinforcedIronPlate, Rotor, ModularFrame, SmartPlating, Steel, SteelBeam, SteelPipe, IndustrialSteelBeam, Stator, Motor, VersatileFramework, AutomaticWire, Plastic, Rubber, Fuel ]
-
-
-allOptions : List RecipesOption
-allOptions =
-    [ IncludeResourceExtractor, BoltedModularFrame, QuickwireStator, FusedWire, CopperRotor, SteamedCopperSheet ]
-
-
-
-{- Utils -}
-
-
 powerPerGenerator : EnergyGenerator -> MW
 powerPerGenerator generator =
     case generator of
@@ -307,7 +328,7 @@ ioPerGenerator generator =
             [ ItemIO 15 Oil ]
 
 
-altRecipeText : RecipesOption -> String
+altRecipeText : AltRecipe -> String
 altRecipeText option =
     case option of
         BoltedModularFrame ->
@@ -322,17 +343,23 @@ altRecipeText option =
         CopperRotor ->
             "Copper Rotor"
 
-        IncludeResourceExtractor ->
-            "Include Resorce Extractor"
-
         SteamedCopperSheet ->
             "Steamed Copper Sheet"
+
+
+productionOptionText : ProductionOption -> String
+productionOptionText option =
+    case option of
+        IncludeResourceExtractor ->
+            "Include Resource Extractor"
 
 
 initProductGraph : ProductGraphModel
 initProductGraph =
     { needs = Array.fromList [ perMinute 2 SmartPlating ]
-    , altRecipes = allOptions |> List.map (\key -> ( altRecipeText key, False )) |> Dict.fromList
+    , altRecipes = allAltRecipes |> List.map (\key -> ( altRecipeText key, False )) |> Dict.fromList
+    , productionOptions = allProductionOptions |> List.map (\key -> ( productionOptionText key, False )) |> Dict.fromList
+    , byproductUsage = None
     }
 
 
@@ -420,6 +447,12 @@ updateProductGraph msg model =
         UpdateAltRecipe recipe bool ->
             { model | altRecipes = Dict.insert recipe bool model.altRecipes }
 
+        UpdateProductionOption recipe bool ->
+            { model | productionOptions = Dict.insert recipe bool model.productionOptions }
+
+        UpdateByProducts newUsage ->
+            { model | byproductUsage = newUsage }
+
 
 removeIndexInArray : Int -> Array a -> Array a
 removeIndexInArray index array =
@@ -450,12 +483,6 @@ mulMW coef (MW a) =
 addMW : MW -> MW -> MW
 addMW (MW a) (MW b) =
     MW (a + b)
-
-
-textMW : MW -> String
-textMW (MW a) =
-    String.fromInt a
-        ++ "MW"
 
 
 mwView : MW -> Element msg
@@ -564,7 +591,7 @@ setProduct product (ItemIO quantity _) =
     ItemIO quantity product
 
 
-itemIOToMachineGroup : RecipesOptions -> ItemIO -> MachineGroup
+itemIOToMachineGroup : ActivatedAltRecipes -> ItemIO -> MachineGroup
 itemIOToMachineGroup activatedAltRecipes (ItemIO targetQuantity targetItem) =
     let
         recipeToMachineGroup : Recipe -> MachineGroup
@@ -627,8 +654,19 @@ getMachingeGroupOrderIndex (MachineGroup { what }) =
             Debug.todo ""
 
 
-isOptionActivated : RecipesOption -> RecipesOptions -> Bool
-isOptionActivated recipe recipes =
+isOptionActivated : ProductionOption -> ProductionOptions -> Bool
+isOptionActivated option options =
+    let
+        key =
+            productionOptionText option
+    in
+    options
+        |> Dict.get key
+        |> Maybe.withDefault False
+
+
+isAltRecipeActivated : AltRecipe -> ActivatedAltRecipes -> Bool
+isAltRecipeActivated recipe recipes =
     let
         key =
             altRecipeText recipe
@@ -638,7 +676,7 @@ isOptionActivated recipe recipes =
         |> Maybe.withDefault False
 
 
-getRecipeOf : RecipesOptions -> IntermediateProduct -> Recipe
+getRecipeOf : ActivatedAltRecipes -> IntermediateProduct -> Recipe
 getRecipeOf options product =
     case product of
         IronOre ->
@@ -678,7 +716,7 @@ getRecipeOf options product =
                 }
 
         CopperWire ->
-            if isOptionActivated FusedWire options then
+            if isAltRecipeActivated FusedWire options then
                 Assembler
                     { input = ( perMinute 70 CopperIngot, perMinute 7.5 CateriumIngot )
                     , output = perMinute 225 CopperWire
@@ -691,7 +729,7 @@ getRecipeOf options product =
                     }
 
         CopperSheet ->
-            if isOptionActivated SteamedCopperSheet options then
+            if isAltRecipeActivated SteamedCopperSheet options then
                 Refinery
                     { input = ( perMinute 27.5 Water, Just <| perMinute 27.5 CopperIngot )
                     , output = perMinute 27.5 CopperSheet
@@ -735,7 +773,7 @@ getRecipeOf options product =
                 }
 
         Rotor ->
-            if isOptionActivated CopperRotor options then
+            if isAltRecipeActivated CopperRotor options then
                 Assembler
                     { input = ( perMinute 56.25 CopperSheet, perMinute 487.5 Screw )
                     , output = perMinute 28.1 Rotor
@@ -754,7 +792,7 @@ getRecipeOf options product =
                 }
 
         ModularFrame ->
-            if isOptionActivated BoltedModularFrame options then
+            if isAltRecipeActivated BoltedModularFrame options then
                 Assembler
                     { input = ( perMinute 7.5 ReinforcedIronPlate, perMinute 140 Screw )
                     , output = perMinute 5 ModularFrame
@@ -803,7 +841,7 @@ getRecipeOf options product =
                 }
 
         Stator ->
-            if isOptionActivated QuickwireStator options then
+            if isAltRecipeActivated QuickwireStator options then
                 Assembler
                     { input = ( perMinute 40 SteelPipe, perMinute 150 Quickwire )
                     , output = perMinute 20 Stator
@@ -836,7 +874,6 @@ getRecipeOf options product =
         Oil ->
             OilExtractor <| perMinute 120 Oil
 
-        -- RFuel 60R -> 40
         Fuel ->
             Refinery
                 { input = ( perMinute 60 Oil, Nothing )
@@ -844,28 +881,22 @@ getRecipeOf options product =
                 , byproduct = Just (perMinute 30 PolymerResidue)
                 }
 
-        -- RPlastic 60PR 20W -> 20
         Plastic ->
             Refinery
                 { input = ( perMinute 30 Oil, Nothing )
                 , output = perMinute 20 Plastic
-                , byproduct = Just (perMinute 10 PolymerResidue)
+                , byproduct = Just (perMinute 10 HeavyOilResidue)
                 }
 
-        -- RRubber 40PR 40W 20
         Rubber ->
             Refinery
                 { input = ( perMinute 30 Oil, Nothing )
                 , output = perMinute 20 Rubber
-                , byproduct = Just (perMinute 20 PolymerResidue)
+                , byproduct = Just (perMinute 20 HeavyOilResidue)
                 }
 
         Coke ->
-            Refinery
-                { input = ( perMinute 40 PolymerResidue, Nothing )
-                , output = perMinute 120 Coke
-                , byproduct = Nothing
-                }
+            Residue
 
         HeavyOilResidue ->
             Residue
@@ -922,7 +953,7 @@ consumeMachineGroupItems io (MachineGroup group) =
             (setQuantity newQuantity io)
 
 
-removeUnwantedItem : RecipesOptions -> ItemIO -> Bool
+removeUnwantedItem : ActivatedAltRecipes -> ItemIO -> Bool
 removeUnwantedItem options (ItemIO _ item) =
     if isOptionActivated IncludeResourceExtractor options then
         True
@@ -951,7 +982,7 @@ removeUnwantedItem options (ItemIO _ item) =
                 True
 
 
-addProductionNeeds : RecipesOptions -> ItemIO -> ProductionLane -> ( ProductionLane, List ItemIO )
+addProductionNeeds : ActivatedAltRecipes -> ItemIO -> ProductionLane -> ( ProductionLane, List ItemIO )
 addProductionNeeds options io lane =
     let
         itemName =
@@ -984,13 +1015,23 @@ addProductionNeeds options io lane =
                     ( Dict.insert itemName groupToAdd lane, machineGroupInput newGroup )
 
 
-getProductLaneFor : RecipesOptions -> List ItemIO -> ProductionLane
-getProductLaneFor options io =
-    getProductLaneForHelper options io Dict.empty
+getProductLaneFor : ByproductUsage -> ActivatedAltRecipes -> ProductionOptions -> List ItemIO -> ProductionLane
+getProductLaneFor usage altRecipes options io =
+    let
+        lane =
+            getProductLaneForHelper altRecipes options io Dict.empty
+
+        -- TODO Merge instead of inserting
+        insertMachineGroup group =
+            Dict.insert (intermediateProductText <| machineGroupProduction group) group
+    in
+    getResiduesOfLane lane
+        |> List.concatMap (splitResidueRecipe usage)
+        |> List.foldl insertMachineGroup lane
 
 
-getProductLaneForHelper : RecipesOptions -> List ItemIO -> ProductionLane -> ProductionLane
-getProductLaneForHelper options remaining lane =
+getProductLaneForHelper : ActivatedAltRecipes -> ProductionOptions -> List ItemIO -> ProductionLane -> ProductionLane
+getProductLaneForHelper altRecipes options remaining lane =
     case remaining of
         [] ->
             lane
@@ -998,12 +1039,125 @@ getProductLaneForHelper options remaining lane =
         io :: rest ->
             let
                 ( newLane, missingIO ) =
-                    addProductionNeeds options io lane
+                    addProductionNeeds altRecipes io lane
 
                 filteredMissingIO =
                     List.filter (removeUnwantedItem options) missingIO
             in
-            getProductLaneForHelper options (List.append rest filteredMissingIO) newLane
+            getProductLaneForHelper altRecipes options (List.append rest filteredMissingIO) newLane
+
+
+splitIO : Float -> ItemIO -> ( ItemIO, ItemIO )
+splitIO coef (ItemIO quantity item) =
+    ( ItemIO (coef * quantity) item
+    , ItemIO ((1 - coef) * quantity) item
+    )
+
+
+getRecipesUsingResidue : IntermediateProduct -> List Recipe
+getRecipesUsingResidue product =
+    case product of
+        PolymerResidue ->
+            [ Refinery
+                { input = ( perMinute 60 PolymerResidue, Just <| perMinute 20 Water )
+                , output = perMinute 20 Plastic
+                , byproduct = Nothing
+                }
+            , Refinery
+                { input = ( perMinute 40 PolymerResidue, Just <| perMinute 40 Water )
+                , output = perMinute 20 Rubber
+                , byproduct = Nothing
+                }
+            ]
+
+        HeavyOilResidue ->
+            [ Refinery
+                { input = ( perMinute 60 HeavyOilResidue, Nothing )
+                , output = perMinute 40 Fuel
+                , byproduct = Nothing
+                }
+            , Refinery
+                { input = ( perMinute 40 HeavyOilResidue, Nothing )
+                , output = perMinute 120 Coke
+                , byproduct = Nothing
+                }
+            ]
+
+        _ ->
+            []
+
+
+getResiduesOfLane : ProductionLane -> List ItemIO
+getResiduesOfLane lane =
+    Dict.values lane
+        |> List.filterMap getMachineGroupByproduct
+
+
+getMachineGroupByproduct : MachineGroup -> Maybe ItemIO
+getMachineGroupByproduct (MachineGroup { what, count }) =
+    recipeByproduct what
+        |> Maybe.map (mulItemIO count)
+
+
+getResidueRatio : IntermediateProduct -> ByproductUsage -> Maybe Float
+getResidueRatio product usage =
+    case usage of
+        None ->
+            Nothing
+
+        Balanced { heavyOilResidueRatio, polymerResidueRatio } ->
+            case product of
+                HeavyOilResidue ->
+                    Just heavyOilResidueRatio
+
+                PolymerResidue ->
+                    Just polymerResidueRatio
+
+                _ ->
+                    Nothing
+
+
+splitResidueRecipe : ByproductUsage -> ItemIO -> List MachineGroup
+splitResidueRecipe usage io =
+    let
+        residueRecipeToMachineGroup : ItemIO -> Recipe -> MachineGroup
+        residueRecipeToMachineGroup (ItemIO targetQuantity _) recipe =
+            let
+                perMachineQuantity =
+                    getQuantity (recipeOutput recipe)
+
+                machineNeeded =
+                    targetQuantity
+                        / perMachineQuantity
+                        |> ceiling
+
+                -- TODO Calculate correct output ratio with incomplete input
+                thougtput =
+                    ItemIO 0 (getProduct <| recipeOutput recipe)
+            in
+            MachineGroup
+                { what = recipe
+                , count = machineNeeded
+                , availableThrougtput = thougtput
+                }
+    in
+    case getResidueRatio (getProduct io) usage of
+        Nothing ->
+            []
+
+        Just ratio ->
+            case getRecipesUsingResidue (getProduct io) of
+                [ recipeA, recipeB ] ->
+                    let
+                        ( ioA, ioB ) =
+                            splitIO ratio io
+                    in
+                    [ residueRecipeToMachineGroup ioA recipeA
+                    , residueRecipeToMachineGroup ioB recipeB
+                    ]
+
+                _ ->
+                    []
 
 
 
@@ -1222,17 +1376,26 @@ machineGroupView (MachineGroup { what, count, availableThrougtput }) =
     let
         remaining =
             if emptyItemIO availableThrougtput then
-                ""
+                Element.none
 
             else
-                "with a surplus of " ++ itemIOText availableThrougtput
+                text <| "with a surplus of " ++ itemIOText availableThrougtput
+
+        byproduct =
+            case recipeByproduct what of
+                Nothing ->
+                    Element.none
+
+                Just io ->
+                    row [] [ text "and ", itemIOView io ]
     in
     row [ Element.spacing (stylesheetSpacing Stylesheet.SmallSpace) ]
         [ text (String.fromInt count)
         , el [ Font.light, tooltip Element.above (recipeTooltipView what), Element.pointer ] (text (assemblyMachineText what))
         , text "producing"
         , el [ Font.light ] (text (intermediateProductText <| getProduct <| recipeOutput <| what))
-        , text remaining
+        , remaining
+        , byproduct
         ]
 
 
@@ -1357,10 +1520,10 @@ editionLineView { needs } =
         )
 
 
-toggleOptionsView : RecipesOptions -> Element ProductGraphMsg
-toggleOptionsView recipes =
+toggleAltRecipesView : ActivatedAltRecipes -> Element ProductGraphMsg
+toggleAltRecipesView recipes =
     let
-        altRecipeView ( key, value ) =
+        checkbox ( key, value ) =
             Input.checkbox []
                 { onChange = UpdateAltRecipe key
                 , icon = Input.defaultCheckbox
@@ -1369,10 +1532,61 @@ toggleOptionsView recipes =
                 }
     in
     column [ Element.spacing (stylesheetSpacing Stylesheet.SmallSpace) ]
-        [ text "Options"
+        [ text "Alt recipes"
         , column
             []
-            (recipes |> Dict.toList |> List.map altRecipeView)
+            (recipes |> Dict.toList |> List.map checkbox)
+        ]
+
+
+productionOptionsView : ProductionOptions -> Element ProductGraphMsg
+productionOptionsView options =
+    let
+        checkbox ( key, value ) =
+            Input.checkbox []
+                { onChange = UpdateProductionOption key
+                , icon = Input.defaultCheckbox
+                , checked = value
+                , label = Input.labelRight [] (text key)
+                }
+    in
+    column [ Element.spacing (stylesheetSpacing Stylesheet.SmallSpace) ]
+        [ text "Production options"
+        , column
+            []
+            (options |> Dict.toList |> List.map checkbox)
+        ]
+
+
+byproductUsageView : ByproductUsage -> Element ProductGraphMsg
+byproductUsageView usage =
+    let
+        onChange bool =
+            if bool then
+                UpdateByProducts <| Balanced { heavyOilResidueRatio = 0.5, polymerResidueRatio = 0.5 }
+
+            else
+                UpdateByProducts <| None
+
+        checked =
+            case usage of
+                None ->
+                    False
+
+                Balanced _ ->
+                    True
+
+        checkbox =
+            Input.checkbox []
+                { onChange = onChange
+                , icon = Input.defaultCheckbox
+                , checked = checked
+                , label = Input.labelRight [] (text "Handle byproducts")
+                }
+    in
+    column [ Element.spacing (stylesheetSpacing Stylesheet.SmallSpace) ]
+        [ text "Byproducts"
+        , checkbox
         ]
 
 
@@ -1382,13 +1596,15 @@ viewProductGraph model =
         lane =
             model.needs
                 |> Array.toList
-                |> getProductLaneFor model.altRecipes
+                |> getProductLaneFor model.byproductUsage model.altRecipes model.productionOptions
     in
-    column [ Element.spacing (stylesheetSpacing Stylesheet.RegularSpace) ]
+    column [ Element.spacing (stylesheetSpacing Stylesheet.RegularSpace), Element.width Element.fill ]
         [ row
             [ Element.spaceEvenly, Element.width Element.fill ]
             [ el [ Element.alignTop ] (editionLineView model)
-            , el [ Element.alignTop ] (toggleOptionsView model.altRecipes)
+            , el [ Element.alignTop ] (toggleAltRecipesView model.altRecipes)
+            , el [ Element.alignTop ] (productionOptionsView model.productionOptions)
+            , el [ Element.alignTop ] (byproductUsageView model.byproductUsage)
             ]
         , productionLaneView lane
         ]

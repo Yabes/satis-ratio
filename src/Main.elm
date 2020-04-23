@@ -52,9 +52,10 @@ view { productGraph } =
         , Element.padding (stylesheetSpacing Stylesheet.SmallSpace)
         ]
         (Element.column
-            [ Font.size (stylesheetFontsize Stylesheet.TextSize) ]
+            [ Font.size (stylesheetFontsize Stylesheet.TextSize), Element.width Element.fill ]
             [ Element.el
                 [ Font.size (stylesheetFontsize Stylesheet.TitleSize)
+                , Element.width Element.fill
                 , Element.paddingEach { edges | bottom = stylesheetSpacing Stylesheet.LargeSpace }
                 ]
                 (Element.text "Blunt Satisfactory ratio calculator")
