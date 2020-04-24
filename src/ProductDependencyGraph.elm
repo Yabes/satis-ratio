@@ -1,4 +1,4 @@
-module ProductDependencyGraph exposing (ProductGraphModel, ProductGraphMsg, initProductGraph, updateProductGraph, viewProductGraph)
+module ProductDependencyGraph exposing (ProductGraphModel, ProductGraphMsg, encodeGraph, initProductGraph, updateProductGraph, viewProductGraph)
 
 import Array exposing (Array)
 import Dict exposing (Dict)
@@ -7,9 +7,11 @@ import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
 import Element.Input as Input
+import Graph exposing (Graph)
 import Html exposing (button, option, select)
 import Html.Attributes exposing (selected, style, type_, value)
 import Html.Events exposing (onInput)
+import Json.Encode as E
 import List
 import Stylesheet exposing (stylesheetColor, stylesheetSpacing)
 
@@ -133,6 +135,10 @@ type alias ActivatedAltRecipes =
 
 type alias ProductionOptions =
     Dict String Bool
+
+
+type alias ProductionLaneGraph =
+    Graph MachineGroup ItemIO
 
 
 type alias ProductGraphModel =
@@ -375,6 +381,25 @@ listFind fn list =
 
             else
                 listFind fn rest
+
+
+listIndex : (a -> Bool) -> List a -> Maybe Int
+listIndex fn list =
+    listIndexHelper 0 fn list
+
+
+listIndexHelper : Int -> (a -> Bool) -> List a -> Maybe Int
+listIndexHelper index fn list =
+    case list of
+        [] ->
+            Nothing
+
+        head :: rest ->
+            if fn head then
+                Just index
+
+            else
+                listIndexHelper (index + 1) fn rest
 
 
 parseProduct : String -> Maybe IntermediateProduct
@@ -1160,6 +1185,85 @@ splitResidueRecipe usage io =
                     []
 
 
+productLaneGraph : ProductionLane -> ProductionLaneGraph
+productLaneGraph lane =
+    let
+        values =
+            Dict.values lane
+
+        createNode id group =
+            { id = id, label = group }
+
+        createEdge from to io =
+            { from = from, to = to, label = io }
+
+        getIOIndex : ItemIO -> Int
+        getIOIndex io =
+            listIndex (\group -> machineGroupProduction group == getProduct io) values
+                |> Maybe.withDefault -1
+
+        edgeMapper : Int -> MachineGroup -> List (Graph.Edge ItemIO)
+        edgeMapper index group =
+            machineGroupInput group
+                |> List.map (\io -> createEdge (getIOIndex io) index io)
+
+        nodes =
+            List.indexedMap createNode values
+
+        edges =
+            List.indexedMap edgeMapper values
+                |> List.concat
+    in
+    Graph.fromNodesAndEdges nodes edges
+
+
+getLane : ProductGraphModel -> ProductionLane
+getLane model =
+    model.needs
+        |> Array.toList
+        |> getProductLaneFor model.byproductUsage model.altRecipes model.productionOptions
+
+
+
+{- Encode -}
+
+
+encodeGraph : ProductGraphModel -> E.Value
+encodeGraph model =
+    let
+        graph =
+            getLane model
+                |> productLaneGraph
+
+        createNode { id, label } =
+            E.object
+                [ ( "id", E.int id )
+                , ( "title", E.string <| intermediateProductText <| machineGroupProduction label )
+                ]
+
+        createLink { from, to, label } =
+            let
+                title =
+                    intermediateProductText <| getProduct label
+            in
+            E.object
+                [ ( "source", E.int from )
+                , ( "target", E.int to )
+                , ( "value", E.int 1 )
+                , ( "title", E.string title )
+                , ( "type", E.string title )
+                ]
+    in
+    E.object
+        [ ( "nodes"
+          , E.list createNode <| Graph.nodes graph
+          )
+        , ( "links"
+          , E.list createLink <| Graph.edges graph
+          )
+        ]
+
+
 
 {- View -}
 
@@ -1592,12 +1696,6 @@ byproductUsageView usage =
 
 viewProductGraph : ProductGraphModel -> Element ProductGraphMsg
 viewProductGraph model =
-    let
-        lane =
-            model.needs
-                |> Array.toList
-                |> getProductLaneFor model.byproductUsage model.altRecipes model.productionOptions
-    in
     column [ Element.spacing (stylesheetSpacing Stylesheet.RegularSpace), Element.width Element.fill ]
         [ row
             [ Element.spaceEvenly, Element.width Element.fill ]
@@ -1606,7 +1704,7 @@ viewProductGraph model =
             , el [ Element.alignTop ] (productionOptionsView model.productionOptions)
             , el [ Element.alignTop ] (byproductUsageView model.byproductUsage)
             ]
-        , productionLaneView lane
+        , productionLaneView <| getLane model
         ]
 
 
