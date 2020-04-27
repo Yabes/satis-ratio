@@ -9,9 +9,10 @@ WORKDIR /home/node
 COPY public public
 COPY src src
 COPY tests tests
-COPY elm.json elm.json
+COPY elm.json package.json package-lock.json ./
 
 RUN export PATH=~/.npm-global/bin:$PATH && \
+    npm ci && \
     elm-app build
 
 
