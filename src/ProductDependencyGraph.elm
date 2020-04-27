@@ -1,6 +1,7 @@
 module ProductDependencyGraph exposing (ProductGraphModel, ProductGraphMsg, encodeGraph, initProductGraph, updateProductGraph, viewProductGraph)
 
 import Array exposing (Array)
+import Color exposing (Color)
 import Dict exposing (Dict)
 import Element exposing (Element, column, el, row, text)
 import Element.Background as Background
@@ -222,6 +223,13 @@ machineGroupInput (MachineGroup { what, count }) =
         |> List.map (mulItemIO count)
 
 
+machineGroupOutput : MachineGroup -> ItemIO
+machineGroupOutput (MachineGroup { what, count }) =
+    what
+        |> recipeOutput
+        |> mulItemIO count
+
+
 recipeOutput : Recipe -> ItemIO
 recipeOutput recipe =
     case recipe of
@@ -287,6 +295,16 @@ machineGroupProduction (MachineGroup { what }) =
             recipeOutput what
     in
     product
+
+
+machineGroupMachine : MachineGroup -> String
+machineGroupMachine (MachineGroup { what }) =
+    assemblyMachineText what
+
+
+machineGroupCount : MachineGroup -> Int
+machineGroupCount (MachineGroup { count }) =
+    count
 
 
 powerPerGenerator : EnergyGenerator -> MW
@@ -701,6 +719,118 @@ isAltRecipeActivated recipe recipes =
         |> Maybe.withDefault False
 
 
+productColor : IntermediateProduct -> Color
+productColor product =
+    case product of
+        IronOre ->
+            Color.rgb255 132 132 158
+
+        CopperOre ->
+            Color.rgb255 159 95 79
+
+        CateriumOre ->
+            Color.rgb255 164 144 101
+
+        Coal ->
+            Color.rgb255 64 64 77
+
+        Water ->
+            Color.rgb255 35 88 122
+
+        LimeStone ->
+            Color.rgb255 151 148 159
+
+        Concrete ->
+            Color.rgb255 197 187 142
+
+        CateriumIngot ->
+            Color.rgb255 172 165 138
+
+        IronIngot ->
+            Color.rgb255 143 145 135
+
+        CopperIngot ->
+            Color.rgb255 130 90 74
+
+        Quickwire ->
+            Color.rgb255 181 172 123
+
+        CopperWire ->
+            Color.rgb255 160 104 68
+
+        CopperSheet ->
+            Color.rgb255 173 129 109
+
+        CopperCable ->
+            Color.rgb255 115 117 115
+
+        IronPlate ->
+            Color.rgb255 167 168 174
+
+        IronRod ->
+            Color.rgb255 95 93 94
+
+        Screw ->
+            Color.rgb255 51 60 173
+
+        ReinforcedIronPlate ->
+            Color.rgb255 88 92 121
+
+        Rotor ->
+            Color.rgb255 110 61 36
+
+        SmartPlating ->
+            Color.rgb255 145 62 53
+
+        ModularFrame ->
+            Color.rgb255 129 130 130
+
+        Steel ->
+            Color.rgb255 47 52 64
+
+        SteelPipe ->
+            Color.rgb255 58 54 54
+
+        SteelBeam ->
+            Color.rgb255 39 39 46
+
+        IndustrialSteelBeam ->
+            Color.rgb255 234 225 186
+
+        VersatileFramework ->
+            Color.rgb255 144 61 45
+
+        AutomaticWire ->
+            Color.rgb255 165 64 42
+
+        Stator ->
+            Color.rgb255 103 115 160
+
+        Motor ->
+            Color.rgb255 165 135 54
+
+        Oil ->
+            Color.rgb255 18 17 19
+
+        Fuel ->
+            Color.rgb255 189 120 42
+
+        Plastic ->
+            Color.rgb255 101 169 242
+
+        Rubber ->
+            Color.rgb255 61 60 61
+
+        Coke ->
+            Color.rgb255 45 43 56
+
+        HeavyOilResidue ->
+            Color.rgb255 111 0 125
+
+        PolymerResidue ->
+            Color.rgb255 40 0 141
+
+
 getRecipeOf : ActivatedAltRecipes -> IntermediateProduct -> Recipe
 getRecipeOf options product =
     case product of
@@ -731,7 +861,7 @@ getRecipeOf options product =
         CateriumIngot ->
             Smelter
                 { input = perMinute 45 CateriumOre
-                , output = perMinute 15 CopperIngot
+                , output = perMinute 15 CateriumIngot
                 }
 
         Quickwire ->
@@ -1236,22 +1366,37 @@ encodeGraph model =
                 |> productLaneGraph
 
         createNode { id, label } =
+            let
+                title =
+                    String.fromInt (machineGroupCount label) ++ "x " ++ machineGroupMachine label
+
+                output =
+                    machineGroupOutput label
+            in
             E.object
                 [ ( "id", E.int id )
-                , ( "title", E.string <| intermediateProductText <| machineGroupProduction label )
+                , ( "title", E.string <| title )
+
+                -- , ( "fixedValue", E.float <| getQuantity <| output )
+                , ( "color", E.string <| Color.toCssString <| productColor <| getProduct output )
                 ]
 
         createLink { from, to, label } =
             let
                 title =
-                    intermediateProductText <| getProduct label
+                    (intermediateProductText <|
+                        getProduct label
+                    )
+                        ++ " ("
+                        ++ String.fromFloat
+                            (getQuantity label)
+                        ++ ")"
             in
             E.object
                 [ ( "source", E.int from )
                 , ( "target", E.int to )
-                , ( "value", E.int 1 )
+                , ( "value", E.float <| getQuantity label )
                 , ( "title", E.string title )
-                , ( "type", E.string title )
                 ]
     in
     E.object
@@ -1448,7 +1593,7 @@ recipeTooltipView recipe =
         , Element.padding <| stylesheetSpacing Stylesheet.SmallSpace
         , Element.spacing <| stylesheetSpacing Stylesheet.RegularSpace
         ]
-        [ row [ Element.width Element.fill ]
+        [ row []
             [ el [] (text "per machine:")
             , el [ Element.alignRight ] consumption
             ]

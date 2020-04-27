@@ -1,27 +1,72 @@
-module Main exposing (main)
+port module Main exposing (main)
 
 import Browser
 import Element
 import Element.Font as Font
 import Html exposing (Html)
-import ProductDependencyGraph exposing (ProductGraphModel, ProductGraphMsg, initProductGraph, updateProductGraph, viewProductGraph)
+import Json.Decode as D
+import Json.Encode as E
+import ProductDependencyGraph exposing (ProductGraphModel, ProductGraphMsg, encodeGraph, initProductGraph, updateProductGraph, viewProductGraph)
 import Stylesheet exposing (edges, stylesheetColor, stylesheetFontsize, stylesheetSpacing)
+import Svg
+import Svg.Attributes
+
+
+
+---- PORTS ----
+
+
+port setDiagramData : E.Value -> Cmd msg
+
+
+
+---- ENCODE/DECODE ----
+
+
+encode : Model -> E.Value
+encode model =
+    encodeGraph model.productGraph
+
+
+decode : D.Decoder GraphMeta
+decode =
+    D.map2 GraphMeta
+        (D.field "width" D.int)
+        (D.field "height" D.int)
 
 
 
 ---- MODEL ----
 
 
+type alias GraphMeta =
+    { width : Int, height : Int }
+
+
 type alias Model =
     { productGraph : ProductGraphModel
+    , graph : GraphMeta
     }
 
 
-init : ( Model, Cmd Msg )
-init =
-    ( { productGraph = initProductGraph
-      }
-    , Cmd.none
+init : E.Value -> ( Model, Cmd Msg )
+init flags =
+    let
+        graph =
+            case D.decodeValue decode flags of
+                Ok graph_ ->
+                    graph_
+
+                Err _ ->
+                    { width = 0, height = 0 }
+
+        model =
+            { productGraph = initProductGraph
+            , graph = graph
+            }
+    in
+    ( model
+    , setDiagramData <| encode model
     )
 
 
@@ -37,7 +82,13 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         ProductGraphMsg innerMsg ->
-            ( { model | productGraph = updateProductGraph innerMsg model.productGraph }, Cmd.none )
+            let
+                newModel =
+                    { model | productGraph = updateProductGraph innerMsg model.productGraph }
+            in
+            ( newModel
+            , setDiagramData <| encode newModel
+            )
 
 
 
@@ -45,21 +96,31 @@ update msg model =
 
 
 view : Model -> Html Msg
-view { productGraph } =
+view { productGraph, graph } =
     Element.layout
         [ Font.color (stylesheetColor Stylesheet.TextColor)
         , Font.family [ Font.monospace ]
         , Element.padding (stylesheetSpacing Stylesheet.SmallSpace)
         ]
         (Element.column
-            [ Font.size (stylesheetFontsize Stylesheet.TextSize), Element.width Element.fill ]
+            [ Font.size (stylesheetFontsize Stylesheet.TextSize) ]
             [ Element.el
                 [ Font.size (stylesheetFontsize Stylesheet.TitleSize)
-                , Element.width Element.fill
                 , Element.paddingEach { edges | bottom = stylesheetSpacing Stylesheet.LargeSpace }
                 ]
                 (Element.text "Blunt Satisfactory ratio calculator")
             , Element.map ProductGraphMsg (viewProductGraph productGraph)
+            , Element.el
+                [ Element.padding <| stylesheetSpacing Stylesheet.LargeSpace
+                , Element.width <| Element.px graph.width
+                , Element.height <| Element.px graph.height
+                ]
+                (Element.html <|
+                    Svg.svg
+                        [ Svg.Attributes.id "sankey"
+                        ]
+                        []
+                )
             ]
         )
 
@@ -68,11 +129,11 @@ view { productGraph } =
 ---- PROGRAM ----
 
 
-main : Program () Model Msg
+main : Program E.Value Model Msg
 main =
     Browser.element
         { view = view
-        , init = \_ -> init
+        , init = init
         , update = update
         , subscriptions = always Sub.none
         }
