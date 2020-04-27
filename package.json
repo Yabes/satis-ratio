@@ -1,0 +1,27 @@
+{
+  "name": "satis-ratio",
+  "version": "1.0.0",
+  "description": "This project is bootstrapped with [Create Elm App](https://github.com/halfzebra/create-elm-app).",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "dependencies": {
+    "d3": "^5.16.0",
+    "d3-sankey": "^0.12.3"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Yabes/satis-ratio.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Yabes/satis-ratio/issues"
+  },
+  "homepage": "https://github.com/Yabes/satis-ratio#readme"
+}
