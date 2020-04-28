@@ -1368,7 +1368,7 @@ encodeGraph model =
         createNode { id, label } =
             let
                 title =
-                    String.fromInt (machineGroupCount label) ++ "x " ++ machineGroupMachine label
+                    String.fromInt (machineGroupCount label) ++ " " ++ (intermediateProductText <| getProduct output) ++ " " ++ machineGroupMachine label
 
                 output =
                     machineGroupOutput label
