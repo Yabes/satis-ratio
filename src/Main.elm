@@ -7,9 +7,9 @@ import Html exposing (Html)
 import Json.Decode as D
 import Json.Encode as E
 import ProductDependencyGraph exposing (ProductGraphModel, ProductGraphMsg, encodeGraph, initProductGraph, updateProductGraph, viewProductGraph)
-import Stylesheet exposing (edges, stylesheetColor, stylesheetFontsize, stylesheetSpacing)
 import Svg
 import Svg.Attributes
+import Ui exposing (color, fontsize, noEdges, space)
 
 
 
@@ -98,28 +98,30 @@ update msg model =
 view : Model -> Html Msg
 view { productGraph, graph } =
     Element.layout
-        [ Font.color (stylesheetColor Stylesheet.TextColor)
+        [ Font.color (color Ui.TextColor)
         , Font.family [ Font.monospace ]
-        , Element.padding (stylesheetSpacing Stylesheet.SmallSpace)
+        , Element.padding (space Ui.SmallSpace)
         ]
         (Element.column
-            [ Font.size (stylesheetFontsize Stylesheet.TextSize) ]
+            [ Font.size (fontsize Ui.TextSize) ]
+            -- Title
             [ Element.el
-                [ Font.size (stylesheetFontsize Stylesheet.TitleSize)
-                , Element.paddingEach { edges | bottom = stylesheetSpacing Stylesheet.LargeSpace }
+                [ Font.size (fontsize Ui.TitleSize)
+                , Element.paddingEach { noEdges | bottom = space Ui.LargeSpace }
                 ]
                 (Element.text "Blunt Satisfactory ratio calculator")
+
+            -- Graph settings and text view
             , Element.map ProductGraphMsg (viewProductGraph productGraph)
+
+            -- Sankey diagram
             , Element.el
-                [ Element.padding <| stylesheetSpacing Stylesheet.LargeSpace
+                [ Element.padding <| space Ui.LargeSpace
                 , Element.width <| Element.px graph.width
                 , Element.height <| Element.px graph.height
                 ]
                 (Element.html <|
-                    Svg.svg
-                        [ Svg.Attributes.id "sankey"
-                        ]
-                        []
+                    Svg.svg [ Svg.Attributes.id "sankey" ] []
                 )
             ]
         )

@@ -14,7 +14,7 @@ import Html.Attributes exposing (selected, style, type_, value)
 import Html.Events exposing (onInput)
 import Json.Encode as E
 import List
-import Stylesheet exposing (stylesheetColor, stylesheetSpacing)
+import Ui exposing (color, space)
 
 
 
@@ -539,7 +539,7 @@ mwView (MW a) =
         innerText =
             String.fromInt a ++ "MW"
     in
-    el [ Font.bold, Font.color <| stylesheetColor Stylesheet.YellowColor ] (text innerText)
+    el [ Font.bold, Font.color <| color Ui.YellowColor ] (text innerText)
 
 
 recipeConsumption : Recipe -> MW
@@ -1568,7 +1568,7 @@ itemIOView (ItemIO float product) =
             String.fromFloat float
     in
     row
-        [ Element.spacing (stylesheetSpacing Stylesheet.SmallSpace) ]
+        [ Element.spacing (space Ui.SmallSpace) ]
         [ text quantity, text <| intermediateProductText product ]
 
 
@@ -1584,38 +1584,23 @@ recipeTooltipView recipe =
             column [] (List.map itemIOView list)
     in
     column
-        [ Background.color <| stylesheetColor Stylesheet.WhiteColor
-        , Border.color <| stylesheetColor Stylesheet.BlackColor
+        [ Background.color <| color Ui.WhiteColor
+        , Border.color <| color Ui.BlackColor
         , Border.rounded 5
         , Border.width 1
-        , Element.padding <| stylesheetSpacing Stylesheet.SmallSpace
-        , Element.spacing <| stylesheetSpacing Stylesheet.RegularSpace
+        , Element.padding <| space Ui.SmallSpace
+        , Element.spacing <| space Ui.RegularSpace
         ]
         [ row []
             [ el [] (text "per machine:")
             , el [ Element.alignRight ] consumption
             ]
-        , row [ Element.spacing <| stylesheetSpacing Stylesheet.LargeSpace ]
+        , row [ Element.spacing <| space Ui.LargeSpace ]
             [ ioColumn <| recipeInput recipe
             , el [ Element.centerY ] (text "→")
             , ioColumn <| recipeOutputWithByroduct recipe
             ]
         ]
-
-
-tooltip : (Element msg -> Element.Attribute msg) -> Element Never -> Element.Attribute msg
-tooltip usher tooltip_ =
-    Element.inFront <|
-        el
-            [ Element.width Element.fill
-            , Element.height Element.fill
-            , Element.transparent True
-            , Element.mouseOver [ Element.transparent False ]
-            , (usher << Element.map never) <|
-                el [ Element.htmlAttribute (Html.Attributes.style "pointerEvents" "none") ]
-                    tooltip_
-            ]
-            Element.none
 
 
 machineGroupView : MachineGroup -> Element msg
@@ -1636,9 +1621,9 @@ machineGroupView (MachineGroup { what, count, availableThrougtput }) =
                 Just io ->
                     row [] [ text "and ", itemIOView io ]
     in
-    row [ Element.spacing (stylesheetSpacing Stylesheet.SmallSpace) ]
+    row [ Element.spacing (space Ui.SmallSpace) ]
         [ text (String.fromInt count)
-        , el [ Font.light, tooltip Element.above (recipeTooltipView what), Element.pointer ] (text (assemblyMachineText what))
+        , el [ Font.light, Ui.tooltip Element.above (recipeTooltipView what), Element.pointer ] (text (assemblyMachineText what))
         , text "producing"
         , el [ Font.light ] (text (intermediateProductText <| getProduct <| recipeOutput <| what))
         , remaining
@@ -1669,12 +1654,12 @@ productionLaneView lane =
 
         neededGeneratorView ( generator, count ) =
             row
-                [ Element.spacing (stylesheetSpacing Stylesheet.SmallSpace) ]
+                [ Element.spacing (space Ui.SmallSpace) ]
                 [ text (String.fromInt count), viewGenerator generator ]
     in
-    column [ Element.spacing (stylesheetSpacing Stylesheet.SmallSpace) ]
+    column [ Element.spacing (space Ui.SmallSpace) ]
         [ row
-            [ Element.spacing (stylesheetSpacing Stylesheet.SmallSpace) ]
+            [ Element.spacing (space Ui.SmallSpace) ]
             [ text "Total consumption:"
             , mwView totalConsumption
             , getNeededGenerator totalConsumption
@@ -1732,13 +1717,13 @@ itemIOInputView index (ItemIO quantity product) =
         removeButton =
             if index /= 0 then
                 Input.button
-                    [ Font.color (stylesheetColor Stylesheet.DangerColor) ]
+                    [ Font.color (color Ui.DangerColor) ]
                     { onPress = Just (RemoveProductNeed index), label = text "Remove" }
 
             else
                 Element.none
     in
-    row [ Element.spacing (stylesheetSpacing Stylesheet.SmallSpace) ]
+    row [ Element.spacing (space Ui.SmallSpace) ]
         [ updateProductQuantityView index quantity
         , selectProductView index product
         , removeButton
@@ -1755,10 +1740,10 @@ editionLineView { needs } =
 
         addButton =
             Input.button
-                [ Font.color (stylesheetColor Stylesheet.InfoColor) ]
+                [ Font.color (color Ui.InfoColor) ]
                 { onPress = Just AddProductNeed, label = text "+ Add" }
     in
-    column [ Element.spacing (stylesheetSpacing Stylesheet.SmallSpace) ]
+    column [ Element.spacing (space Ui.SmallSpace) ]
         (List.concat
             [ [ text "I want to produce every minute" ]
             , needsInputs
@@ -1778,7 +1763,7 @@ toggleAltRecipesView recipes =
                 , label = Input.labelRight [] (text key)
                 }
     in
-    column [ Element.spacing (stylesheetSpacing Stylesheet.SmallSpace) ]
+    column [ Element.spacing (space Ui.SmallSpace) ]
         [ text "Alt recipes"
         , column
             []
@@ -1797,7 +1782,7 @@ productionOptionsView options =
                 , label = Input.labelRight [] (text key)
                 }
     in
-    column [ Element.spacing (stylesheetSpacing Stylesheet.SmallSpace) ]
+    column [ Element.spacing (space Ui.SmallSpace) ]
         [ text "Production options"
         , column
             []
@@ -1831,7 +1816,7 @@ byproductUsageView usage =
                 , label = Input.labelRight [] (text "Handle byproducts")
                 }
     in
-    column [ Element.spacing (stylesheetSpacing Stylesheet.SmallSpace) ]
+    column [ Element.spacing (space Ui.SmallSpace) ]
         [ text "Byproducts"
         , checkbox
         ]
@@ -1839,7 +1824,7 @@ byproductUsageView usage =
 
 viewProductGraph : ProductGraphModel -> Element ProductGraphMsg
 viewProductGraph model =
-    column [ Element.spacing (stylesheetSpacing Stylesheet.RegularSpace), Element.width Element.fill ]
+    column [ Element.spacing (space Ui.RegularSpace), Element.width Element.fill ]
         [ row
             [ Element.spaceEvenly, Element.width Element.fill ]
             [ el [ Element.alignTop ] (editionLineView model)
@@ -1856,21 +1841,21 @@ viewGenerator generator =
     case generator of
         BiomassBurner ->
             el
-                [ Font.color (stylesheetColor Stylesheet.GreenColor)
+                [ Font.color (color Ui.GreenColor)
                 , Font.bold
                 ]
                 (text "Biomass Burner")
 
         CoalGenerator ->
             el
-                [ Font.color (stylesheetColor Stylesheet.BlackColor)
+                [ Font.color (color Ui.BlackColor)
                 , Font.bold
                 ]
                 (text "Coal Generator")
 
         FuelGenerator ->
             el
-                [ Font.color (stylesheetColor Stylesheet.PurpleColor)
+                [ Font.color (color Ui.PurpleColor)
                 , Font.bold
                 ]
                 (text "Fuel Generator")
