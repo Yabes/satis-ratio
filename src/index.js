@@ -30,6 +30,22 @@ const app = Elm.Main.init({
   }
 });
 
+function nodeTitle(d) {
+  const input = d.targetLinks.length > 0
+    ? '\n\nInput:\n' + d.targetLinks.map(l => l.title).join('\n')
+    : '';
+
+  const output = d.sourceLinks.length > 0
+    ? '\n\nUsed output:\n' + d.sourceLinks.map(l => l.title).join('\n')
+    : '';
+
+  const extra = d.extra.charAt(0) !== '0'
+    ? '\n\nExtra output:\n' + d.extra
+    : '';
+
+  return `${d.title}${input}${output}${extra}`;
+}
+
 const svg = d3.select('#sankey').attr('viewBox', [0, 0, width, height]);
 svg.append('g').attr('class', 'nodes');
 svg.append('g').attr('class', 'edges');
@@ -40,18 +56,17 @@ const t = svg.transition().duration(700);
 app.ports.setDiagramData.subscribe(data => {
   const { nodes, links } = diagram(data);
 
-  // svg.selectAll('g.edges > g').remove();
-  // svg.selectAll('g.texts > text').remove();
+  svg.selectAll("*").interrupt();
 
   if (links.length === 0 || nodes.length === 0) {
+    svg.selectAll('g > *').remove();
     return;
   }
-  console.log({ nodes, links });
 
   svg
     .select('g.nodes')
     .selectAll('rect')
-    .data(nodes, d => d.title)
+    .data(nodes, d => d.production)
     .join(
       enter =>
         enter
@@ -59,17 +74,16 @@ app.ports.setDiagramData.subscribe(data => {
           .attr('fill', d => d.color)
           .attr('height', d => d.y1 - d.y0)
           .attr('width', d => d.x1 - d.x0)
-          .attr('x', 0)
+          .attr('x', d => d.x0)
           .attr('y', d => d.y0)
           .attr('fill-opacity', 0)
           .call(enter_ =>
             enter_
               .transition(t)
-              .attr('x', d => d.x0)
               .attr('fill-opacity', 1)
           )
       .append('title')
-      .text(d => `${d.title}\n${d.value}`)
+      .text(nodeTitle)
       ,
       update =>
         update
@@ -94,7 +108,7 @@ app.ports.setDiagramData.subscribe(data => {
     .select('g.edges')
     .attr('fill', 'none')
     .selectAll('path')
-    .data(links, d => d.source.title + d.source.sourceLinks.findIndex(l => l === d))
+    .data(links, d => d.source.production + d.source.sourceLinks.findIndex(l => l === d))
     .join(enter =>
       enter
         .append('path')
@@ -107,7 +121,7 @@ app.ports.setDiagramData.subscribe(data => {
             .transition(t)
             .attr('stroke-opacity', 0.5)
         )
-        .append('title').text(d => `${d.source.title} → ${d.target.title}\n${d.value}`)
+        .append('title').text(d => d.title)
       ,
       update => update
         .call(update_ =>
@@ -136,7 +150,7 @@ app.ports.setDiagramData.subscribe(data => {
       enter =>
         enter
           .append('text')
-          .attr('x', d => 0)
+          .attr('x', d => (d.x0 < width / 2 ? d.x1 + 6 : d.x0 - 6))
           .attr('y', d => (d.y1 + d.y0) / 2)
           .attr('text-anchor', d => (d.x0 < width / 2 ? 'start' : 'end'))
           .attr('dy', '0.35em')
@@ -146,13 +160,13 @@ app.ports.setDiagramData.subscribe(data => {
             enter_
               .transition(t)
               .attr('fill-opacity', 1)
-              .attr('x', d => (d.x0 < width / 2 ? d.x1 + 6 : d.x0 - 6))
           )
       ,
       update =>
       update.call(update_ =>
         update_
           .transition(t)
+          .attr('fill-opacity', 1)
           .attr('x', d => (d.x0 < width / 2 ? d.x1 + 6 : d.x0 - 6))
           .attr('y', d => (d.y1 + d.y0) / 2)
           .attr('text-anchor', d => (d.x0 < width / 2 ? 'start' : 'end'))

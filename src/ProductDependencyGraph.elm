@@ -307,6 +307,11 @@ machineGroupCount (MachineGroup { count }) =
     count
 
 
+machineGroupExtraneous : MachineGroup -> ItemIO
+machineGroupExtraneous (MachineGroup { availableThrougtput }) =
+    availableThrougtput
+
+
 powerPerGenerator : EnergyGenerator -> MW
 powerPerGenerator generator =
     case generator of
@@ -1376,27 +1381,20 @@ encodeGraph model =
             E.object
                 [ ( "id", E.int id )
                 , ( "title", E.string <| title )
+                , ( "production", E.string <| intermediateProductText <| getProduct output )
+                , ( "extra", E.string <| itemIOText <| machineGroupExtraneous label )
 
                 -- , ( "fixedValue", E.float <| getQuantity <| output )
                 , ( "color", E.string <| Color.toCssString <| productColor <| getProduct output )
                 ]
 
         createLink { from, to, label } =
-            let
-                title =
-                    (intermediateProductText <|
-                        getProduct label
-                    )
-                        ++ " ("
-                        ++ String.fromFloat
-                            (getQuantity label)
-                        ++ ")"
-            in
             E.object
                 [ ( "source", E.int from )
                 , ( "target", E.int to )
                 , ( "value", E.float <| getQuantity label )
-                , ( "title", E.string title )
+                , ( "type", E.string <| intermediateProductText <| getProduct label )
+                , ( "title", E.string <| itemIOText label )
                 ]
     in
     E.object
