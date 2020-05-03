@@ -6,7 +6,7 @@ import Element.Font as Font
 import Html exposing (Html)
 import Json.Decode as D
 import Json.Encode as E
-import ProductDependencyGraph exposing (ProductGraphModel, ProductGraphMsg, encodeGraph, initProductGraph, updateProductGraph, viewProductGraph)
+import Satis.ProductionGraph exposing (ProductGraphModel, ProductGraphMsg, encodeGraph, initProductGraph, updateProductGraph, viewProductGraph)
 import Svg
 import Svg.Attributes
 import Ui exposing (color, fontsize, noEdges, space)
