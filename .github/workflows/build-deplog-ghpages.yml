@@ -24,27 +24,27 @@ jobs:
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
-
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo Hello, world!
-
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
-        run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
-          
-      - name: Setup Elm environment
-        uses: JorelAli/setup-elm@v2
+        
       - name: Setup Node.js environment
         uses: actions/setup-node@v2.1.4
-      - run: |
-          npm ci
-          ./node_modules/.bin/elm-app build
-          - name: GitHub Pages
-        # You may pin to the exact commit or the version.
-        # uses: crazy-max/ghaction-github-pages@1510b11c0c2f843eafb8ff41b3da8c467c8d4a9f
+        
+      - name: Setup Elm environment
+        uses: JorelAli/setup-elm@v2
+        
+      - name: Setup elm-app
+        run: |
+          mkdir -p ~/.npm-global && \
+          npm config set prefix '~/.npm-global' && \
+          npm install create-elm-app -g
+          
+      - name: Install node dependencies
+        run: npm ci
+      
+      - name: Build app
+        run: |
+          export PATH=~/.npm-global/bin:$PATH
+          elm-app build
+
       - name: Deploy to GH Pages
         uses: crazy-max/ghaction-github-pages@v2.2.0
         with:
