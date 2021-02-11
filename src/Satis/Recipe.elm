@@ -73,7 +73,7 @@ input recipe =
         Refinery { input_ } ->
             optionalTupleToList input_
 
-        Residue ->
+        Residue _ ->
             []
 
 
@@ -162,7 +162,7 @@ consumption recipe =
         OilExtractor _ ->
             Energy.make 40
 
-        Residue ->
+        Residue _ ->
             Energy.make 0
 
 
@@ -390,13 +390,13 @@ getRecipeOf options product =
                 }
 
         Coke ->
-            Residue
+            Residue Coke
 
         HeavyOilResidue ->
-            Residue
+            Residue HeavyOilResidue
 
         PolymerResidue ->
-            Residue
+            Residue HeavyOilResidue
 
 
 getRecipesUsingResidue : IntermediateProduct -> List Recipe
@@ -459,7 +459,7 @@ order recipe =
         Assembler _ ->
             31
 
-        Residue ->
+        Residue _ ->
             99
 
 
@@ -494,7 +494,7 @@ assemblyMachineText recipe =
         OilExtractor _ ->
             "Oil Extractor"
 
-        Residue ->
+        Residue _ ->
             "Residue"
 
 
