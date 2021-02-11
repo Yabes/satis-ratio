@@ -23,7 +23,7 @@ type Recipe
     | Constructor { input_ : ItemIO, output_ : ItemIO }
     | Assembler { input_ : ( ItemIO, ItemIO ), output_ : ItemIO }
     | Refinery { input_ : ( ItemIO, Maybe ItemIO ), output_ : ItemIO, byproduct_ : Maybe ItemIO }
-    | Residue
+    | Residue ItemIO
 
 
 
@@ -74,7 +74,7 @@ input recipe =
             optionalTupleToList input_
 
         Residue ->
-            Debug.todo ""
+            []
 
 
 output : Recipe -> ItemIO
@@ -104,8 +104,8 @@ output recipe =
         Refinery { output_ } ->
             output_
 
-        Residue ->
-            Debug.todo "Find a way to avoid Residue input_ Recipe"
+        Residue output_ ->
+            output_
 
 
 byproduct : Recipe -> Maybe ItemIO
@@ -163,7 +163,7 @@ consumption recipe =
             Energy.make 40
 
         Residue ->
-            Debug.todo ""
+            Energy.make 0
 
 
 
@@ -460,7 +460,7 @@ order recipe =
             31
 
         Residue ->
-            Debug.todo ""
+            99
 
 
 
@@ -495,7 +495,7 @@ assemblyMachineText recipe =
             "Oil Extractor"
 
         Residue ->
-            Debug.todo ""
+            "Residue"
 
 
 viewTooltip : Recipe -> Element msg
