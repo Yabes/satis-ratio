@@ -390,13 +390,13 @@ getRecipeOf options product =
                 }
 
         Coke ->
-            Residue Coke
+            Residue IO.perMinute 0 Coke
 
         HeavyOilResidue ->
-            Residue HeavyOilResidue
+            Residue IO.perMinute 0 HeavyOilResidue
 
         PolymerResidue ->
-            Residue HeavyOilResidue
+            Residue IO.perMinute 0 PolymerResidue
 
 
 getRecipesUsingResidue : IntermediateProduct -> List Recipe
