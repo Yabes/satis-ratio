@@ -43,7 +43,7 @@ jobs:
       - name: Build app
         run: |
           export PATH=~/.npm-global/bin:$PATH
-          elm-app build
+          PUBLIC_URL=./satis-ratio/ elm-app build
 
       - name: Deploy to GH Pages
         uses: crazy-max/ghaction-github-pages@v2.2.0
